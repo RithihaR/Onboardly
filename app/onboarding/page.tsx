@@ -25,8 +25,16 @@ interface ModuleDetail {
   content: string;
 }
  
-// TODO: replace with the real logged-in worker's id once auth exists.
+// TODO: replace with the real logged-in worker's id/name once auth exists.
 const WORKER_ID = "W-1001";
+const WORKER_DISPLAY_NAME = "Jessie Jeyasingh";
+const COMPANY_NAME = "Southern Cross Distribution";
+ 
+function formatTime(totalSeconds: number) {
+  const m = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
+  const s = (totalSeconds % 60).toString().padStart(2, "0");
+  return `${m}:${s}`;
+}
  
 export default function OnboardingPage() {
   const [moduleList, setModuleList] = useState<ModuleListItem[]>([]);
@@ -37,8 +45,8 @@ export default function OnboardingPage() {
   const [acknowledged, setAcknowledged] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [seconds, setSeconds] = useState(0);
  
-  // 1. Load the ordered module list once on mount.
   useEffect(() => {
     fetch("/api/modules")
       .then((r) => r.json())
@@ -53,7 +61,6 @@ export default function OnboardingPage() {
       });
   }, []);
  
-  // 2. Whenever the current index changes, fetch that module's English content.
   useEffect(() => {
     if (moduleList.length === 0) return;
     const id = moduleList[index].id;
@@ -73,6 +80,14 @@ export default function OnboardingPage() {
       })
       .finally(() => setLoadingModule(false));
   }, [moduleList, index]);
+ 
+  // Cumulative session timer — mirrors the reference screenshot's
+  // "Cumulative Time" readout. Counts the whole onboarding session,
+  // not per-module.
+  useEffect(() => {
+    const interval = setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => clearInterval(interval);
+  }, []);
  
   async function handleAcknowledge() {
     if (!current) return;
@@ -101,76 +116,121 @@ export default function OnboardingPage() {
   }
  
   if (loadingList) {
-    return <div style={{ padding: 40, fontFamily: "sans-serif" }}>Loading modules…</div>;
+    return <div className="min-h-screen flex items-center justify-center bg-zinc-900 text-zinc-400">Loading modules…</div>;
   }
   if (moduleList.length === 0) {
-    return <div style={{ padding: 40, fontFamily: "sans-serif" }}>No modules found — check the induction_modules table.</div>;
+    return <div className="min-h-screen flex items-center justify-center bg-zinc-900 text-zinc-400">No modules found — check the induction_modules table.</div>;
   }
  
   const isLast = index === moduleList.length - 1;
  
   return (
-    <div style={{ minHeight: "100vh", background: "#F4F1E9", fontFamily: "'IBM Plex Sans', sans-serif" }}>
-      <div style={{ maxWidth: 680, margin: "0 auto", padding: "40px 24px" }}>
+    <div className="min-h-screen flex flex-col bg-zinc-900">
+      {/* Top bar */}
+      <header className="flex items-center justify-between bg-zinc-950 text-white px-6 py-3 border-b border-zinc-800 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-orange-600 flex items-center justify-center font-bold text-sm">
+            SC
+          </div>
+          <div>
+            <div className="text-[11px] text-zinc-400 uppercase tracking-wide font-semibold">
+              {COMPANY_NAME}
+            </div>
+            <div className="font-semibold text-sm leading-tight">
+              {current?.title ?? "Loading…"}
+            </div>
+          </div>
+        </div>
+ 
+        <div className="hidden sm:flex flex-col items-center text-xs text-zinc-400">
+          <span className="uppercase tracking-wide text-[10px]">Cumulative Time</span>
+          <span className="font-mono text-zinc-200 text-sm">{formatTime(seconds)}</span>
+        </div>
+ 
+        <div className="flex items-center gap-3 text-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-zinc-700 flex items-center justify-center">
+              <span className="text-xs">👤</span>
+            </div>
+            <div className="hidden md:block leading-tight">
+              <div className="text-[10px] text-zinc-400 uppercase tracking-wide">Logged in as</div>
+              <div className="text-zinc-100 text-sm font-medium">{WORKER_DISPLAY_NAME}</div>
+            </div>
+          </div>
+        </div>
+      </header>
+ 
+      {/* Main content */}
+      <main className="flex-1 flex items-center justify-center p-6 sm:p-10 bg-gradient-to-b from-zinc-800 via-zinc-850 to-zinc-900">
         {loadingModule || !current ? (
-          <div>Loading module…</div>
+          <div className="text-zinc-400">Loading module…</div>
         ) : (
-          <>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: "#B9791C", marginBottom: 6 }}>
-              MODULE {index + 1} OF {moduleList.length} · {current.category?.toUpperCase()}
+          <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full p-8 sm:p-10">
+            <div className="text-xs font-bold text-orange-600 uppercase tracking-wide mb-2">
+              {current.category}
             </div>
-            <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 28, fontWeight: 600, color: "#1A1F26", marginBottom: 22 }}>
+            <h1 className="text-2xl font-bold text-zinc-900 mb-6">
               {current.title}
+            </h1>
+            <div className="whitespace-pre-wrap leading-relaxed text-zinc-700 text-[15px]">
+              {current.content}
             </div>
- 
-            <div style={{ background: "#fff", border: "1px solid #E2DFD6", borderRadius: 10, padding: 30 }}>
-              <div style={{ fontSize: 15.5, lineHeight: 1.75, color: "#242A31" }}>{current.content}</div>
-            </div>
- 
-            {error && <div style={{ marginTop: 12, fontSize: 13, color: "#C0453B" }}>{error}</div>}
- 
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24 }}>
-              <button
-                onClick={handlePrev}
-                disabled={index === 0}
-                style={{
-                  background: "transparent", border: "1px solid #3A4150", color: "#1A1F26",
-                  borderRadius: 6, padding: "10px 16px", fontWeight: 700,
-                  cursor: index === 0 ? "default" : "pointer", opacity: index === 0 ? 0.4 : 1,
-                }}
-              >
-                ← Previous
-              </button>
- 
-              {!acknowledged ? (
-                <button
-                  onClick={handleAcknowledge}
-                  disabled={saving}
-                  style={{
-                    background: "#1A1F26", color: "#fff", border: "none", borderRadius: 6,
-                    padding: "10px 20px", fontWeight: 700,
-                    cursor: saving ? "default" : "pointer", opacity: saving ? 0.6 : 1,
-                  }}
-                >
-                  {saving ? "Saving…" : "I understand this module"}
-                </button>
-              ) : (
-                <button
-                  onClick={handleNext}
-                  disabled={isLast}
-                  style={{
-                    background: "#E8A93B", color: "#0E1116", border: "none", borderRadius: 6,
-                    padding: "10px 20px", fontWeight: 700,
-                    cursor: isLast ? "default" : "pointer", opacity: isLast ? 0.4 : 1,
-                  }}
-                >
-                  {isLast ? "All modules complete ✓" : "Next module →"}
-                </button>
-              )}
-            </div>
-          </>
+          </div>
         )}
-      </div>
+      </main>
+ 
+      {error && (
+        <div className="bg-red-950/60 text-red-300 text-sm px-6 py-2 border-t border-red-900">
+          {error}
+        </div>
+      )}
+ 
+      {/* Bottom bar */}
+      <footer className="bg-zinc-950 border-t border-zinc-800 px-6 py-4 shrink-0">
+        {/* Segmented progress — one segment per module */}
+        <div className="flex items-center gap-2 mb-4">
+          {moduleList.map((m, i) => (
+            <div
+              key={m.id}
+              className={`h-1.5 flex-1 rounded-full transition-colors ${
+                i < index ? "bg-orange-500" : i === index ? "bg-red-500" : "bg-zinc-700"
+              }`}
+            />
+          ))}
+        </div>
+ 
+        <div className="flex items-center justify-between">
+          <button
+            onClick={handlePrev}
+            disabled={index === 0}
+            className="flex items-center gap-1.5 text-sm font-semibold text-zinc-300 border border-zinc-700 rounded-md px-4 py-2 disabled:opacity-30 disabled:cursor-default hover:not(:disabled):bg-zinc-800 transition-colors"
+          >
+            ← Previous
+          </button>
+ 
+          <div className="text-xs text-zinc-500 font-medium">
+            Module {index + 1} of {moduleList.length}
+          </div>
+ 
+          {!acknowledged ? (
+            <button
+              onClick={handleAcknowledge}
+              disabled={saving}
+              className="bg-red-600 hover:bg-red-500 text-white font-bold px-6 py-2.5 rounded-md text-sm disabled:opacity-60 disabled:cursor-default transition-colors shadow-lg shadow-red-950/50"
+            >
+              {saving ? "Saving…" : "I understand this module"}
+            </button>
+          ) : (
+            <button
+              onClick={handleNext}
+              disabled={isLast}
+              className="bg-orange-500 hover:bg-orange-400 text-zinc-900 font-bold px-6 py-2.5 rounded-md text-sm disabled:opacity-40 disabled:cursor-default transition-colors shadow-lg shadow-orange-950/30"
+            >
+              {isLast ? "All modules complete ✓" : "Next module →"}
+            </button>
+          )}
+        </div>
+      </footer>
     </div>
   );
 }
