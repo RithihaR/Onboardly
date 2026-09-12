@@ -17,18 +17,18 @@ import { useEffect, useState } from "react";
 import OnboardlyWidget from "@/components/onboardly-widget/OnboardlyWidget";
 
 interface ModuleListItem {
-  id: string;
-  title: string;
-  display_order: number;
+    id: string;
+    title: string;
+    display_order: number;
 }
 
 interface ModuleDetail {
-  id: string;
-  title: string;
-  order: number;
-  version: string;
-  category: string;
-  content: string;
+    id: string;
+    title: string;
+    order: number;
+    version: string;
+    category: string;
+    content: string;
 }
 
 const WORKER_ID = "W-1001";
@@ -36,9 +36,9 @@ const WORKER_DISPLAY_NAME = "Jacob Nair Rudhrakumar Spiteri Jeyasingh";
 const COMPANY_NAME = "Southern Cross Distribution";
 
 function formatTime(totalSeconds: number) {
-  const m = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
-  const s = (totalSeconds % 60).toString().padStart(2, "0");
-  return `${m}:${s}`;
+    const m = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
+    const s = (totalSeconds % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
 }
 
 function HeaderDivider() {
@@ -48,89 +48,89 @@ function HeaderDivider() {
 }
 
 export default function OnboardingPage() {
-  const [moduleList, setModuleList] = useState<ModuleListItem[]>([]);
-  const [index, setIndex] = useState(0);
-  const [current, setCurrent] = useState<ModuleDetail | null>(null);
-  const [loadingList, setLoadingList] = useState(true);
-  const [loadingModule, setLoadingModule] = useState(true);
-  const [acknowledged, setAcknowledged] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [seconds, setSeconds] = useState(0);
+    const [moduleList, setModuleList] = useState<ModuleListItem[]>([]);
+    const [index, setIndex] = useState(0);
+    const [current, setCurrent] = useState<ModuleDetail | null>(null);
+    const [loadingList, setLoadingList] = useState(true);
+    const [loadingModule, setLoadingModule] = useState(true);
+    const [acknowledged, setAcknowledged] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [seconds, setSeconds] = useState(0);
 
-  useEffect(() => {
-    fetch("/api/modules")
-      .then((r) => r.json())
-      .then((data: ModuleListItem[]) => {
-        setModuleList(data);
-        setLoadingList(false);
-      })
-      .catch((err) => {
-        console.error("Failed to load module list", err);
-        setError("Could not load the module list.");
-        setLoadingList(false);
-      });
-  }, []);
+    useEffect(() => {
+        fetch("/api/modules")
+            .then((r) => r.json())
+            .then((data: ModuleListItem[]) => {
+                setModuleList(data);
+                setLoadingList(false);
+            })
+            .catch((err) => {
+                console.error("Failed to load module list", err);
+                setError("Could not load the module list.");
+                setLoadingList(false);
+            });
+    }, []);
 
-  useEffect(() => {
-    if (moduleList.length === 0) return;
-    const id = moduleList[index].id;
-    setLoadingModule(true);
-    setAcknowledged(false);
-    setError(null);
+    useEffect(() => {
+        if (moduleList.length === 0) return;
+        const id = moduleList[index].id;
+        setLoadingModule(true);
+        setAcknowledged(false);
+        setError(null);
 
-    fetch(`/api/modules?id=${id}&language=en`)
-      .then((r) => r.json())
-      .then((data: ModuleDetail) => {
-        if ((data as any).error) throw new Error((data as any).error);
-        setCurrent(data);
-      })
-      .catch((err) => {
-        console.error("Failed to load module", err);
-        setError("Could not load this module.");
-      })
-      .finally(() => setLoadingModule(false));
-  }, [moduleList, index]);
+        fetch(`/api/modules?id=${id}&language=en`)
+            .then((r) => r.json())
+            .then((data: ModuleDetail) => {
+                if ((data as any).error) throw new Error((data as any).error);
+                setCurrent(data);
+            })
+            .catch((err) => {
+                console.error("Failed to load module", err);
+                setError("Could not load this module.");
+            })
+            .finally(() => setLoadingModule(false));
+    }, [moduleList, index]);
 
-  useEffect(() => {
-    const interval = setInterval(() => setSeconds((s) => s + 1), 1000);
-    return () => clearInterval(interval);
-  }, []);
+    useEffect(() => {
+        const interval = setInterval(() => setSeconds((s) => s + 1), 1000);
+        return () => clearInterval(interval);
+    }, []);
 
-  async function handleAcknowledge() {
-    if (!current) return;
-    setSaving(true);
-    try {
-      const res = await fetch("/api/progress", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workerId: WORKER_ID, moduleId: current.id }),
-      });
-      if (!res.ok) throw new Error("Progress save failed");
-      setAcknowledged(true);
-    } catch (err) {
-      console.error("Failed to save acknowledgement", err);
-      setError("Couldn't save your acknowledgement — try again.");
-    } finally {
-      setSaving(false);
+    async function handleAcknowledge() {
+        if (!current) return;
+        setSaving(true);
+        try {
+            const res = await fetch("/api/progress", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ workerId: WORKER_ID, moduleId: current.id }),
+            });
+            if (!res.ok) throw new Error("Progress save failed");
+            setAcknowledged(true);
+        } catch (err) {
+            console.error("Failed to save acknowledgement", err);
+            setError("Couldn't save your acknowledgement — try again.");
+        } finally {
+            setSaving(false);
+        }
     }
-  }
 
-  function handleNext() {
-    setIndex((i) => Math.min(i + 1, moduleList.length - 1));
-  }
-  function handlePrev() {
-    setIndex((i) => Math.max(i - 1, 0));
-  }
+    function handleNext() {
+        setIndex((i) => Math.min(i + 1, moduleList.length - 1));
+    }
+    function handlePrev() {
+        setIndex((i) => Math.max(i - 1, 0));
+    }
 
-  if (loadingList) {
-    return <div className="min-h-screen flex items-center justify-center bg-zinc-900 text-zinc-400">Loading modules…</div>;
-  }
-  if (moduleList.length === 0) {
-    return <div className="min-h-screen flex items-center justify-center bg-zinc-900 text-zinc-400">No modules found — check the induction_modules table.</div>;
-  }
+    if (loadingList) {
+        return <div className="min-h-screen flex items-center justify-center bg-zinc-900 text-zinc-400">Loading modules…</div>;
+    }
+    if (moduleList.length === 0) {
+        return <div className="min-h-screen flex items-center justify-center bg-zinc-900 text-zinc-400">No modules found — check the induction_modules table.</div>;
+    }
 
-  const isLast = index === moduleList.length - 1;
+    const isLast = index === moduleList.length - 1;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -196,11 +196,11 @@ export default function OnboardingPage() {
         )}
       </main>
 
-      {error && (
-        <div className="bg-red-950/60 text-red-300 text-sm px-6 py-2 border-t border-red-900">
-          {error}
-        </div>
-      )}
+            {error && (
+                <div className="bg-red-950/60 text-red-300 text-sm px-6 py-2 border-t border-red-900">
+                    {error}
+                </div>
+            )}
 
       {/* Bottom bar */}
       <footer className="bg-orange-600 border-t border-indigo-900 px-6 py-4 shrink-0">
@@ -246,7 +246,7 @@ export default function OnboardingPage() {
         </div>
       </footer>
 
-      <OnboardlyWidget />
-    </div>
-  );
+            <OnboardlyWidget moduleContent={current?.content} />
+        </div>
+    );
 }
