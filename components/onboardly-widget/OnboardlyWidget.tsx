@@ -1,273 +1,171 @@
 "use client";
 
-import React, { useState, useRef, useCallback, useEffect } from "react";
-import FaqPanel from "./FaqPanel";
+import { useEffect, useState } from "react";
+import OnboardlyWidget from "../../components/onboardly-widget/OnboardlyWidget";
 
-const OB = {
-    border: "#E4DFD3",
-    cream: "#FFFFFF",
-    text: "#2B2620",
-    textMuted: "#8A8271",
-    amber: "#E8A93B",
-    red: "#C0453B",
-    green: "#7BAA5A",
-    dotRed: "#8B3A2E",
-    dotAmber: "#E0A83E",
-    dotGreen: "#7BAA5A",
-};
+interface ModuleListItem {
+    id: string;
+    title: string;
+    display_order: number;
+}
 
-const cursive = { fontFamily: "'Caveat', 'Segoe Script', cursive" };
-const body = { fontFamily: "'IBM Plex Sans', sans-serif" };
+interface ModuleDetail {
+    id: string;
+    title: string;
+    order: number;
+    version: string;
+    category: string;
+    content: string;
+}
 
-function useOnboardlyFonts() {
+// TODO: replace with the real logged-in worker's id once auth exists.
+const WORKER_ID = "W-1001";
+
+export default function OnboardingPage() {
+    const [moduleList, setModuleList] = useState<ModuleListItem[]>([]);
+    const [index, setIndex] = useState(0);
+    const [current, setCurrent] = useState<ModuleDetail | null>(null);
+    const [loadingList, setLoadingList] = useState(true);
+    const [loadingModule, setLoadingModule] = useState(true);
+    const [acknowledged, setAcknowledged] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // 1. Load the ordered module list once on mount.
     useEffect(() => {
-        if (document.getElementById("ob-widget-fonts")) return;
-        const link = document.createElement("link");
-        link.id = "ob-widget-fonts";
-        link.rel = "stylesheet";
-        link.href =
-            "https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap";
-        document.head.appendChild(link);
-    }, []);
-}
-
-const WAVEFORM_BARS = [10, 22, 14, 26, 12, 20, 16, 24, 11, 18];
-
-function Waveform({ onClick }: { onClick: () => void }) {
-    return (
-        <button
-            onClick={onClick}
-            aria-label="Click to speak"
-            style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 5,
-                height: 48,
-                width: "100%",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                padding: "0 8px",
-            }}
-        >
-            {WAVEFORM_BARS.map((h, i) => (
-                <div
-                    key={i}
-                    style={{
-                        width: 3,
-                        height: h,
-                        borderRadius: 2,
-                        background: OB.text,
-                    }}
-                />
-            ))}
-        </button>
-    );
-}
-
-interface OnboardlyWidgetProps {
-    language?: string;
-    onAskQuestion?: (question: string) => void;
-    onSpeak?: () => void;
-}
-
-export default function OnboardlyWidget({
-    language,
-    onAskQuestion,
-    onSpeak,
-}: OnboardlyWidgetProps) {
-    useOnboardlyFonts();
-
-    const [expanded, setExpanded] = useState(true);
-    const [view, setView] = useState<"ask" | "faq">("ask");
-    const [question, setQuestion] = useState("");
-
-    const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-    const dragOffset = useRef<{ x: number; y: number } | null>(null);
-    const [dragging, setDragging] = useState(false);
-
-    useEffect(() => {
-        if (pos) return;
-        const width = expanded ? 340 : 56;
-        const height = expanded ? 420 : 56;
-        setPos({
-            x: window.innerWidth - width - 28,
-            y: window.innerHeight - height - 28,
-        });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        fetch("/api/modules")
+            .then((r) => r.json())
+            .then((data: ModuleListItem[]) => {
+                setModuleList(data);
+                setLoadingList(false);
+            })
+            .catch((err) => {
+                console.error("Failed to load module list", err);
+                setError("Could not load the module list.");
+                setLoadingList(false);
+            });
     }, []);
 
-    const onDragStart = useCallback(
-        (e: React.MouseEvent) => {
-            if (!pos) return;
-            dragOffset.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
-            setDragging(true);
-        },
-        [pos]
-    );
-
+    // 2. Whenever the current index changes, fetch that module's English content.
     useEffect(() => {
-        if (!dragging) return;
-        function onMove(e: MouseEvent) {
-            if (!dragOffset.current) return;
-            setPos({ x: e.clientX - dragOffset.current.x, y: e.clientY - dragOffset.current.y });
-        }
-        function onUp() {
-            setDragging(false);
-        }
-        window.addEventListener("mousemove", onMove);
-        window.addEventListener("mouseup", onUp);
-        return () => {
-            window.removeEventListener("mousemove", onMove);
-            window.removeEventListener("mouseup", onUp);
-        };
-    }, [dragging]);
+        if (moduleList.length === 0) return;
+        const id = moduleList[index].id;
+        setLoadingModule(true);
+        setAcknowledged(false);
+        setError(null);
 
-    function handleSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        if (!question.trim()) return;
-        onAskQuestion?.(question);
-        setQuestion("");
+        fetch(`/api/modules?id=${id}&language=en`)
+            .then((r) => r.json())
+            .then((data: ModuleDetail) => {
+                if ((data as any).error) throw new Error((data as any).error);
+                setCurrent(data);
+            })
+            .catch((err) => {
+                console.error("Failed to load module", err);
+                setError("Could not load this module.");
+            })
+            .finally(() => setLoadingModule(false));
+    }, [moduleList, index]);
+
+    async function handleAcknowledge() {
+        if (!current) return;
+        setSaving(true);
+        try {
+            const res = await fetch("/api/progress", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ workerId: WORKER_ID, moduleId: current.id }),
+            });
+            if (!res.ok) throw new Error("Progress save failed");
+            setAcknowledged(true);
+        } catch (err) {
+            console.error("Failed to save acknowledgement", err);
+            setError("Couldn't save your acknowledgement — try again.");
+        } finally {
+            setSaving(false);
+        }
     }
 
-    if (!pos) return null;
-
-    if (!expanded) {
-        return (
-            <button
-                onClick={() => setExpanded(true)}
-                onMouseDown={onDragStart}
-                aria-label="Open Onboardly assistant"
-                style={{
-                    position: "fixed",
-                    left: pos.x,
-                    top: pos.y,
-                    width: 56,
-                    height: 56,
-                    borderRadius: "50%",
-                    background: OB.cream,
-                    border: `1px solid ${OB.border}`,
-                    boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
-                    color: OB.text,
-                    cursor: dragging ? "grabbing" : "grab",
-                    ...cursive,
-                    fontSize: 20,
-                    fontWeight: 700,
-                }}
-            >
-                OB
-            </button>
-        );
+    function handleNext() {
+        setIndex((i) => Math.min(i + 1, moduleList.length - 1));
     }
+    function handlePrev() {
+        setIndex((i) => Math.max(i - 1, 0));
+    }
+
+    if (loadingList) {
+        return <div style={{ padding: 40, fontFamily: "sans-serif" }}>Loading modules…</div>;
+    }
+    if (moduleList.length === 0) {
+        return <div style={{ padding: 40, fontFamily: "sans-serif" }}>No modules found — check the induction_modules table.</div>;
+    }
+
+    const isLast = index === moduleList.length - 1;
 
     return (
-        <div
-            style={{
-                position: "fixed",
-                left: pos.x,
-                top: pos.y,
-                width: 340,
-                background: OB.cream,
-                border: `1px solid ${OB.border}`,
-                borderRadius: 14,
-                overflow: "hidden",
-                boxShadow: "0 8px 28px rgba(0,0,0,0.10)",
-            }}
-        >
-            <div
-                onMouseDown={onDragStart}
-                style={{
-                    padding: "16px 18px 14px",
-                    cursor: dragging ? "grabbing" : "grab",
-                    userSelect: "none",
-                    position: "relative",
-                }}
-            >
-                <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-                    <span style={{ width: 11, height: 11, borderRadius: "50%", background: OB.dotRed }} />
-                    <button
-                        onClick={() => setExpanded(false)}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        aria-label="Minimize assistant"
-                        style={{
-                            width: 11,
-                            height: 11,
-                            borderRadius: "50%",
-                            background: OB.dotAmber,
-                            border: "none",
-                            padding: 0,
-                            cursor: "pointer",
-                        }}
-                    />
-                    <span style={{ width: 11, height: 11, borderRadius: "50%", background: OB.dotGreen }} />
-                </div>
+        <div style={{ minHeight: "100vh", background: "#F4F1E9", fontFamily: "'IBM Plex Sans', sans-serif" }}>
+            <div style={{ maxWidth: 680, margin: "0 auto", padding: "40px 24px" }}>
+                {loadingModule || !current ? (
+                    <div>Loading module…</div>
+                ) : (
+                    <>
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: "#B9791C", marginBottom: 6 }}>
+                            MODULE {index + 1} OF {moduleList.length} · {current.category?.toUpperCase()}
+                        </div>
+                        <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 28, fontWeight: 600, color: "#1A1F26", marginBottom: 22 }}>
+                            {current.title}
+                        </div>
 
-                <button
-                    onClick={() => setView(view === "faq" ? "ask" : "faq")}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    aria-label="Frequently asked questions"
-                    style={{
-                        position: "absolute",
-                        top: 16,
-                        right: 16,
-                        width: 26,
-                        height: 26,
-                        borderRadius: "50%",
-                        border: `1.5px solid ${OB.dotRed}`,
-                        background: view === "faq" ? OB.dotRed : "none",
-                        fontSize: 13,
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                    }}
-                >
-                    <span style={{ color: view === "faq" ? OB.cream : OB.dotRed }}>?</span>
-                </button>
+                        <div style={{ background: "#fff", border: "1px solid #E2DFD6", borderRadius: 10, padding: 30 }}>
+                            <div style={{ fontSize: 15.5, lineHeight: 1.75, color: "#242A31" }}>{current.content}</div>
+                        </div>
 
-                <div style={{ textAlign: "center" }}>
-                    <span style={{ ...cursive, fontSize: 30, color: OB.text, borderBottom: `2px solid ${OB.text}`, paddingBottom: 2 }}>
-                        OnBoardly
-                    </span>
-                </div>
+                        {error && <div style={{ marginTop: 12, fontSize: 13, color: "#C0453B" }}>{error}</div>}
+
+                        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24 }}>
+                            <button
+                                onClick={handlePrev}
+                                disabled={index === 0}
+                                style={{
+                                    background: "transparent", border: "1px solid #3A4150", color: "#1A1F26",
+                                    borderRadius: 6, padding: "10px 16px", fontWeight: 700,
+                                    cursor: index === 0 ? "default" : "pointer", opacity: index === 0 ? 0.4 : 1,
+                                }}
+                            >
+                                ← Previous
+                            </button>
+
+                            {!acknowledged ? (
+                                <button
+                                    onClick={handleAcknowledge}
+                                    disabled={saving}
+                                    style={{
+                                        background: "#1A1F26", color: "#fff", border: "none", borderRadius: 6,
+                                        padding: "10px 20px", fontWeight: 700,
+                                        cursor: saving ? "default" : "pointer", opacity: saving ? 0.6 : 1,
+                                    }}
+                                >
+                                    {saving ? "Saving…" : "I understand this module"}
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleNext}
+                                    disabled={isLast}
+                                    style={{
+                                        background: "#E8A93B", color: "#0E1116", border: "none", borderRadius: 6,
+                                        padding: "10px 20px", fontWeight: 700,
+                                        cursor: isLast ? "default" : "pointer", opacity: isLast ? 0.4 : 1,
+                                    }}
+                                >
+                                    {isLast ? "All modules complete ✓" : "Next module →"}
+                                </button>
+                            )}
+                        </div>
+                    </>
+                )}
             </div>
 
-            {view === "faq" ? (
-                <FaqPanel />
-            ) : (
-                <>
-                    <div style={{ padding: "16px 18px 6px" }}>
-                        <Waveform onClick={() => onSpeak?.()} />
-                        <p style={{ ...body, fontSize: 11, color: OB.textMuted, textAlign: "center", margin: "4px 0 0" }}>
-                            Click to speak
-                        </p>
-                    </div>
-
-                    <form onSubmit={handleSubmit} style={{ padding: "14px 18px 8px" }}>
-                        <input
-                            value={question}
-                            onChange={(e) => setQuestion(e.target.value)}
-                            placeholder="Type to ask questions…"
-                            style={{
-                                ...body,
-                                width: "100%",
-                                boxSizing: "border-box",
-                                padding: "12px 16px",
-                                borderRadius: 999,
-                                border: `1.5px solid ${OB.text}`,
-                                fontSize: 14,
-                                color: OB.text,
-                            }}
-                        />
-                    </form>
-
-                    <p style={{ ...body, fontSize: 10.5, color: OB.textMuted, textAlign: "center", margin: "6px 0 16px" }}>
-                        Brought to you by OnBoardly
-                    </p>
-                </>
-            )}
+            <OnboardlyWidget />
         </div>
     );
 }
