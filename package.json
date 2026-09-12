@@ -7,11 +7,14 @@
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
+    "@tailwindcss/postcss": "^4.3.3",
     "dotenv": "^17.4.2",
     "next": "^16.3.5",
     "pg": "^8.23.0",
+    "postcss": "^8.5.28",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@types/node": "22.20.2",

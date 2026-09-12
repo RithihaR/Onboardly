@@ -1,3 +1,7 @@
+// this file is the FaqPanel.tsx
+// ../../components/onboardly-widget/FaqPanel.tsx is this file 
+
+
 "use client";
 
 import React, { useState } from "react";

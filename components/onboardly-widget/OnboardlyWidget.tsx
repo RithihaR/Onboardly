@@ -1,171 +1,167 @@
+// This page is the OnboardlyWidget.tsx file 
+// ../../components/onboardly-widget/OnboardlyWidget that is this file 
+
+// components/onboardly-widget/OnboardlyWidget.tsx
+// This REPLACES whatever is currently in this file. This is the actual
+// widget: a small floating button, bottom-right, that opens a panel
+// containing the FAQ. It does not fetch modules or know anything about
+// the onboarding page — that separation is the whole point.
+
+// components/onboardly-widget/OnboardlyWidget.tsx
+// The real widget: draggable (grab the header, move it anywhere),
+// shrinks down to a small circular bubble, expands back into a panel
+// showing the FAQ. Uses the same color palette as FaqPanel.tsx so the
+// two visually match.
+
 "use client";
 
-import { useEffect, useState } from "react";
-import OnboardlyWidget from "../../components/onboardly-widget/OnboardlyWidget";
+import { useState, useRef, useEffect, useCallback } from "react";
+import FaqPanel from "./FaqPanel";
 
-interface ModuleListItem {
-    id: string;
-    title: string;
-    display_order: number;
-}
+const OB = {
+  border: "#E4DFD3",
+  cream: "#FFFFFF",
+  text: "#2B2620",
+  textMuted: "#8A8271",
+  dotRed: "#8B3A2E",
+};
 
-interface ModuleDetail {
-    id: string;
-    title: string;
-    order: number;
-    version: string;
-    category: string;
-    content: string;
-}
+const body = { fontFamily: "'IBM Plex Sans', sans-serif" };
 
-// TODO: replace with the real logged-in worker's id once auth exists.
-const WORKER_ID = "W-1001";
+export default function OnboardlyWidget() {
+  // Default position: bottom-right-ish. Recalculated safely on first
+  // client render since `window` isn't available during SSR.
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [ready, setReady] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
 
-export default function OnboardingPage() {
-    const [moduleList, setModuleList] = useState<ModuleListItem[]>([]);
-    const [index, setIndex] = useState(0);
-    const [current, setCurrent] = useState<ModuleDetail | null>(null);
-    const [loadingList, setLoadingList] = useState(true);
-    const [loadingModule, setLoadingModule] = useState(true);
-    const [acknowledged, setAcknowledged] = useState(false);
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    setPos({ x: window.innerWidth - 380, y: window.innerHeight - 480 });
+    setReady(true);
+  }, []);
 
-    // 1. Load the ordered module list once on mount.
-    useEffect(() => {
-        fetch("/api/modules")
-            .then((r) => r.json())
-            .then((data: ModuleListItem[]) => {
-                setModuleList(data);
-                setLoadingList(false);
-            })
-            .catch((err) => {
-                console.error("Failed to load module list", err);
-                setError("Could not load the module list.");
-                setLoadingList(false);
-            });
-    }, []);
+  const onDragStart = useCallback(
+    (e: React.MouseEvent) => {
+      dragOffset.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
+      setDragging(true);
+    },
+    [pos]
+  );
 
-    // 2. Whenever the current index changes, fetch that module's English content.
-    useEffect(() => {
-        if (moduleList.length === 0) return;
-        const id = moduleList[index].id;
-        setLoadingModule(true);
-        setAcknowledged(false);
-        setError(null);
-
-        fetch(`/api/modules?id=${id}&language=en`)
-            .then((r) => r.json())
-            .then((data: ModuleDetail) => {
-                if ((data as any).error) throw new Error((data as any).error);
-                setCurrent(data);
-            })
-            .catch((err) => {
-                console.error("Failed to load module", err);
-                setError("Could not load this module.");
-            })
-            .finally(() => setLoadingModule(false));
-    }, [moduleList, index]);
-
-    async function handleAcknowledge() {
-        if (!current) return;
-        setSaving(true);
-        try {
-            const res = await fetch("/api/progress", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ workerId: WORKER_ID, moduleId: current.id }),
-            });
-            if (!res.ok) throw new Error("Progress save failed");
-            setAcknowledged(true);
-        } catch (err) {
-            console.error("Failed to save acknowledgement", err);
-            setError("Couldn't save your acknowledgement — try again.");
-        } finally {
-            setSaving(false);
-        }
+  useEffect(() => {
+    if (!dragging) return;
+    function onMove(e: MouseEvent) {
+      setPos({ x: e.clientX - dragOffset.current.x, y: e.clientY - dragOffset.current.y });
     }
-
-    function handleNext() {
-        setIndex((i) => Math.min(i + 1, moduleList.length - 1));
+    function onUp() {
+      setDragging(false);
     }
-    function handlePrev() {
-        setIndex((i) => Math.max(i - 1, 0));
-    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [dragging]);
 
-    if (loadingList) {
-        return <div style={{ padding: 40, fontFamily: "sans-serif" }}>Loading modules…</div>;
-    }
-    if (moduleList.length === 0) {
-        return <div style={{ padding: 40, fontFamily: "sans-serif" }}>No modules found — check the induction_modules table.</div>;
-    }
+  if (!ready) return null;
 
-    const isLast = index === moduleList.length - 1;
-
+  if (!expanded) {
     return (
-        <div style={{ minHeight: "100vh", background: "#F4F1E9", fontFamily: "'IBM Plex Sans', sans-serif" }}>
-            <div style={{ maxWidth: 680, margin: "0 auto", padding: "40px 24px" }}>
-                {loadingModule || !current ? (
-                    <div>Loading module…</div>
-                ) : (
-                    <>
-                        <div style={{ fontSize: 12.5, fontWeight: 700, color: "#B9791C", marginBottom: 6 }}>
-                            MODULE {index + 1} OF {moduleList.length} · {current.category?.toUpperCase()}
-                        </div>
-                        <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 28, fontWeight: 600, color: "#1A1F26", marginBottom: 22 }}>
-                            {current.title}
-                        </div>
-
-                        <div style={{ background: "#fff", border: "1px solid #E2DFD6", borderRadius: 10, padding: 30 }}>
-                            <div style={{ fontSize: 15.5, lineHeight: 1.75, color: "#242A31" }}>{current.content}</div>
-                        </div>
-
-                        {error && <div style={{ marginTop: 12, fontSize: 13, color: "#C0453B" }}>{error}</div>}
-
-                        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24 }}>
-                            <button
-                                onClick={handlePrev}
-                                disabled={index === 0}
-                                style={{
-                                    background: "transparent", border: "1px solid #3A4150", color: "#1A1F26",
-                                    borderRadius: 6, padding: "10px 16px", fontWeight: 700,
-                                    cursor: index === 0 ? "default" : "pointer", opacity: index === 0 ? 0.4 : 1,
-                                }}
-                            >
-                                ← Previous
-                            </button>
-
-                            {!acknowledged ? (
-                                <button
-                                    onClick={handleAcknowledge}
-                                    disabled={saving}
-                                    style={{
-                                        background: "#1A1F26", color: "#fff", border: "none", borderRadius: 6,
-                                        padding: "10px 20px", fontWeight: 700,
-                                        cursor: saving ? "default" : "pointer", opacity: saving ? 0.6 : 1,
-                                    }}
-                                >
-                                    {saving ? "Saving…" : "I understand this module"}
-                                </button>
-                            ) : (
-                                <button
-                                    onClick={handleNext}
-                                    disabled={isLast}
-                                    style={{
-                                        background: "#E8A93B", color: "#0E1116", border: "none", borderRadius: 6,
-                                        padding: "10px 20px", fontWeight: 700,
-                                        cursor: isLast ? "default" : "pointer", opacity: isLast ? 0.4 : 1,
-                                    }}
-                                >
-                                    {isLast ? "All modules complete ✓" : "Next module →"}
-                                </button>
-                            )}
-                        </div>
-                    </>
-                )}
-            </div>
-
-            <OnboardlyWidget />
-        </div>
+      <div
+        onMouseDown={onDragStart}
+        style={{
+          position: "fixed",
+          left: pos.x,
+          top: pos.y,
+          width: 56,
+          height: 56,
+          borderRadius: "50%",
+          background: OB.dotRed,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: dragging ? "grabbing" : "grab",
+          zIndex: 50,
+          ...body,
+        }}
+      >
+        <button
+          onClick={() => setExpanded(true)}
+          aria-label="Open onboarding assistant"
+          style={{
+            background: "none",
+            border: "none",
+            color: "#fff",
+            fontSize: 22,
+            fontWeight: 700,
+            cursor: "pointer",
+            width: "100%",
+            height: "100%",
+          }}
+        >
+          ?
+        </button>
+      </div>
     );
+  }
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        left: pos.x,
+        top: pos.y,
+        width: 340,
+        background: OB.cream,
+        border: `1px solid ${OB.border}`,
+        borderRadius: 14,
+        boxShadow: "0 16px 48px rgba(0,0,0,0.28)",
+        overflow: "hidden",
+        zIndex: 50,
+        ...body,
+      }}
+    >
+      {/* Drag handle / header */}
+      <div
+        onMouseDown={onDragStart}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "12px 16px",
+          borderBottom: `1px solid ${OB.border}`,
+          cursor: dragging ? "grabbing" : "grab",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ color: OB.textMuted, fontSize: 13 }}>⠿</span>
+          <span style={{ fontWeight: 700, fontSize: 13.5, color: OB.text }}>
+            Onboarding Assistant
+          </span>
+        </div>
+        <button
+          onClick={() => setExpanded(false)}
+          aria-label="Minimize"
+          style={{
+            background: "none",
+            border: "none",
+            color: OB.textMuted,
+            fontSize: 18,
+            cursor: "pointer",
+            lineHeight: 1,
+          }}
+        >
+          −
+        </button>
+      </div>
+
+      <div style={{ paddingTop: 14, maxHeight: 420, overflowY: "auto" }}>
+        <FaqPanel />
+      </div>
+    </div>
+  );
 }
