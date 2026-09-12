@@ -173,7 +173,7 @@ export default function OnboardingPage() {
                 )}
             </div>
 
-            <OnboardlyWidget />
+            <OnboardlyWidget moduleContent={current?.content} />
         </div>
     );
 }
