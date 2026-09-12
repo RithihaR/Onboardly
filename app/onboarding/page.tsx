@@ -1,17 +1,17 @@
-// MODULE PAGE GOES HERE
-// ModuleViewer content lives here
-
 // app/onboarding/page.tsx
-// English-only for now — language switching removed. Still fetches from
-// the same API route, just always requests "en" and skips the language
-// picker UI entirely.
- 
-// app/onboarding/page.tsx
-// The Tailwind-styled version, with the widget added at the bottom so it
-// floats on top of the page as an overlay — it does not sit inside the
-// white content card, it's a sibling to it.
+//
+// PLACEHOLDER IMAGES — replace these five constants with your real assets
+// once you have them. Everything else in the file references these, so
+// swapping the URLs is the only change needed later.
 
 "use client";
+const COMPANY_LOGO_URL = "/warehouse-logo.png";
+const AVATAR_URL = "/user (1).png";
+const PREV_ARROW_URL = "/left.png";
+const NEXT_ARROW_URL = "/right.png";
+const MODULE_IMAGE_URL = "/warehouse-image.avif";
+
+
 
 import { useEffect, useState } from "react";
 import OnboardlyWidget from "@/components/onboardly-widget/OnboardlyWidget";
@@ -32,13 +32,19 @@ interface ModuleDetail {
 }
 
 const WORKER_ID = "W-1001";
-const WORKER_DISPLAY_NAME = "Jessie Jeyasingh";
+const WORKER_DISPLAY_NAME = "Jacob Nair Rudhrakumar Spiteri Jeyasingh";
 const COMPANY_NAME = "Southern Cross Distribution";
 
 function formatTime(totalSeconds: number) {
   const m = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
   const s = (totalSeconds % 60).toString().padStart(2, "0");
   return `${m}:${s}`;
+}
+
+function HeaderDivider() {
+  // self-stretch makes it span the full height of the flex row it's in,
+  // as long as the parent uses items-stretch (not items-center).
+  return <div className="w-px self-stretch bg-white/30" />;
 }
 
 export default function OnboardingPage() {
@@ -127,54 +133,65 @@ export default function OnboardingPage() {
   const isLast = index === moduleList.length - 1;
 
   return (
-    <div className="min-h-screen flex flex-col bg-zinc-900">
-      <header className="flex items-center justify-between bg-zinc-950 text-white px-6 py-3 border-b border-zinc-800 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-orange-600 flex items-center justify-center font-bold text-sm">
-            SC
+    <div className="min-h-screen flex flex-col">
+      {/* Top bar — orange background, full-height dividers (items-stretch, not items-center) */}
+      <header className="flex items-stretch justify-between bg-orange-600 text-white px-6 py-3 border-b border-orange-700 shrink-0">
+        <div className="flex items-stretch gap-4">
+          <div className="flex items-center gap-3">
+            <img src={COMPANY_LOGO_URL} alt={COMPANY_NAME} className="w-10 h-10 object-contain shrink-0" />
+            <div className="text-sm font-medium">{COMPANY_NAME}</div>
           </div>
-          <div>
-            <div className="text-[11px] text-zinc-400 uppercase tracking-wide font-semibold">
-              {COMPANY_NAME}
-            </div>
-            <div className="font-semibold text-sm leading-tight">
-              {current?.title ?? "Loading…"}
+
+          <HeaderDivider />
+
+          <div className="flex items-center gap-4">
+            {current && <span className="font-semibold text-sm">{current.title}</span>}
+            <div className="hidden sm:flex flex-col justify-center">
+              <span className="text-[10px]">Cumulative Time</span>
+              <span className="font-mono text-sm">{formatTime(seconds)}</span>
             </div>
           </div>
         </div>
 
-        <div className="hidden sm:flex flex-col items-center text-xs text-zinc-400">
-          <span className="uppercase tracking-wide text-[10px]">Cumulative Time</span>
-          <span className="font-mono text-zinc-200 text-sm">{formatTime(seconds)}</span>
-        </div>
-
-        <div className="flex items-center gap-3 text-sm">
+        <div className="flex items-stretch gap-4">
+          <HeaderDivider />
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-zinc-700 flex items-center justify-center">
-              <span className="text-xs">👤</span>
-            </div>
+            <img src={AVATAR_URL} alt="Avatar" className="w-7 h-7 object-cover" />
             <div className="hidden md:block leading-tight">
-              <div className="text-[10px] text-zinc-400 uppercase tracking-wide">Logged in as</div>
-              <div className="text-zinc-100 text-sm font-medium">{WORKER_DISPLAY_NAME}</div>
+              <div className="text-[10px]">Logged in as</div>
+              <div className="text-sm font-medium">{WORKER_DISPLAY_NAME}</div>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 flex items-center justify-center p-6 sm:p-10 bg-gradient-to-b from-zinc-800 via-zinc-850 to-zinc-900">
+      {/* Main content — warehouse photo background with a dark overlay for legibility */}
+      <main
+        className="flex-1 flex items-center justify-center p-6 sm:p-10"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(9,14,30,0.78), rgba(9,14,30,0.88)), url('/warehouse.jfif')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      >
         {loadingModule || !current ? (
-          <div className="text-zinc-400">Loading module…</div>
+          <div className="text-zinc-200">Loading module…</div>
         ) : (
-          <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full p-8 sm:p-10">
-            <div className="text-xs font-bold text-orange-600 uppercase tracking-wide mb-2">
-              {current.category}
+          <div className="bg-white shadow-2xl max-w-3xl w-full p-8 sm:p-10 flex flex-col sm:flex-row gap-8 items-start">
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold text-blue-800 mb-6">
+                {current.title}
+              </h1>
+              <div className="whitespace-pre-wrap leading-relaxed text-zinc-700 text-[15px]">
+                {current.content}
+              </div>
             </div>
-            <h1 className="text-2xl font-bold text-zinc-900 mb-6">
-              {current.title}
-            </h1>
-            <div className="whitespace-pre-wrap leading-relaxed text-zinc-700 text-[15px]">
-              {current.content}
-            </div>
+            <img
+              src={MODULE_IMAGE_URL}
+              alt=""
+              className="w-full sm:w-40 h-40 object-cover shrink-0"
+            />
           </div>
         )}
       </main>
@@ -185,14 +202,14 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      <footer className="bg-zinc-950 border-t border-zinc-800 px-6 py-4 shrink-0">
+      {/* Bottom bar */}
+      <footer className="bg-orange-600 border-t border-indigo-900 px-6 py-4 shrink-0">
+        {/* Progress bar: white = progress made, orange = remaining */}
         <div className="flex items-center gap-2 mb-4">
           {moduleList.map((m, i) => (
             <div
               key={m.id}
-              className={`h-1.5 flex-1 rounded-full transition-colors ${
-                i < index ? "bg-orange-500" : i === index ? "bg-red-500" : "bg-zinc-700"
-              }`}
+              className={`h-1.5 flex-1 ${i <= index ? "bg-white" : "bg-indigo-900"}`}
             />
           ))}
         </div>
@@ -201,31 +218,30 @@ export default function OnboardingPage() {
           <button
             onClick={handlePrev}
             disabled={index === 0}
-            className="flex items-center gap-1.5 text-sm font-semibold text-zinc-300 border border-zinc-700 rounded-md px-4 py-2 disabled:opacity-30 disabled:cursor-default hover:not(:disabled):bg-zinc-800 transition-colors"
+            className="disabled:opacity-30 disabled:cursor-default"
           >
-            ← Previous
+            <img src={PREV_ARROW_URL} alt="Previous module" className="h-8" />
           </button>
-
-          <div className="text-xs text-zinc-500 font-medium">
-            Module {index + 1} of {moduleList.length}
-          </div>
 
           {!acknowledged ? (
             <button
               onClick={handleAcknowledge}
               disabled={saving}
-              className="bg-red-600 hover:bg-red-500 text-white font-bold px-6 py-2.5 rounded-md text-sm disabled:opacity-60 disabled:cursor-default transition-colors shadow-lg shadow-red-950/50"
+              className="bg-red-600 hover:bg-red-500 text-white font-bold px-6 py-2.5 text-sm disabled:opacity-60 disabled:cursor-default transition-colors"
             >
               {saving ? "Saving…" : "I understand this module"}
             </button>
           ) : (
-            <button
-              onClick={handleNext}
-              disabled={isLast}
-              className="bg-orange-500 hover:bg-orange-400 text-zinc-900 font-bold px-6 py-2.5 rounded-md text-sm disabled:opacity-40 disabled:cursor-default transition-colors shadow-lg shadow-orange-950/30"
-            >
-              {isLast ? "All modules complete ✓" : "Next module →"}
-            </button>
+            <div className="flex items-center gap-3">
+              {isLast && <span className="text-white text-xs font-medium">All modules complete ✓</span>}
+              <button
+                onClick={handleNext}
+                disabled={isLast}
+                className="disabled:opacity-30 disabled:cursor-default"
+              >
+                <img src={NEXT_ARROW_URL} alt="Next module" className="h-8" />
+              </button>
+            </div>
           )}
         </div>
       </footer>
