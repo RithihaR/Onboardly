@@ -1,4 +1,10 @@
+import OnboardlyWidget from "./components/onboardly-widget/OnboardlyWidget";
+
 export default function Home() {
-  // Landing page goes here or redirect to /onboarding
-  return <div>Onboardly backend running</div>;
+  return (
+    <div>
+      <div>Onboardly backend running</div>
+      <OnboardlyWidget />
+    </div>
+  );
 }
