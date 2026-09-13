@@ -1,12 +1,17 @@
 // components/onboarding/OnboardingExperience.tsx
 //
-// New in this version: a thin "demo meta bar" above the company-branded
-// header, with a link back to the Onboardly site and a Fullscreen toggle.
-// Clicking Fullscreen hides the meta bar and requests real browser
-// fullscreen, so the demo looks exactly like what a business's actual
-// onboarding page would show — no visible "this is a demo" chrome at all.
-// A small always-visible exit control stays in the corner so there's
-// never a dead end even in immersive mode.
+// New in this version: an optional `videoModule` on CompanyConfig. If set,
+// it's appended as a synthetic final step in the flow — clicking "next"
+// past the last real module reveals it, inside the same header/footer/
+// progress bar as everything else, instead of being a separate page only
+// reachable by typing a URL.
+//
+// The video step is NOT a real row in your induction_modules table, so:
+// - it's added client-side after the real module list loads
+// - its content is never fetched from /api/modules
+// - acknowledging it does NOT call /api/progress (there's no real module
+//   id for it to reference, and your module_progress table likely has a
+//   foreign key to induction_modules — calling it would just error)
 
 "use client";
 
@@ -41,6 +46,7 @@ export interface CompanyConfig {
   nextArrowUrl: string;
   moduleImageUrl: string;
   backgroundImageUrl: string;
+  videoModule?: { title: string; youtubeId: string }; // optional final video step
 }
 
 const THEMES = {
@@ -55,6 +61,8 @@ const THEMES = {
     title: "text-emerald-600",
   },
 };
+
+const VIDEO_MODULE_ID = "video-module";
 
 function formatTime(totalSeconds: number) {
   const m = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
@@ -97,7 +105,10 @@ export function OnboardingExperience({ config }: { config: CompanyConfig }) {
     fetch(`/api/modules?company=${config.companyId}`)
       .then((r) => r.json())
       .then((data: ModuleListItem[]) => {
-        setModuleList(data);
+        const list: ModuleListItem[] = config.videoModule
+          ? [...data, { id: VIDEO_MODULE_ID, title: config.videoModule.title, display_order: data.length + 1 }]
+          : data;
+        setModuleList(list);
         setLoadingList(false);
       })
       .catch((err) => {
@@ -105,15 +116,29 @@ export function OnboardingExperience({ config }: { config: CompanyConfig }) {
         setError("Could not load the module list.");
         setLoadingList(false);
       });
-  }, [config.companyId]);
+  }, [config.companyId, config.videoModule]);
 
   useEffect(() => {
     if (moduleList.length === 0) return;
     const id = moduleList[index].id;
-    setLoadingModule(true);
     setAcknowledged(false);
     setError(null);
 
+    // The video step is synthetic, not a real module — never hit the API for it.
+    if (id === VIDEO_MODULE_ID && config.videoModule) {
+      setCurrent({
+        id: VIDEO_MODULE_ID,
+        title: config.videoModule.title,
+        order: index + 1,
+        version: "",
+        category: "Video",
+        content: "",
+      });
+      setLoadingModule(false);
+      return;
+    }
+
+    setLoadingModule(true);
     fetch(`/api/modules?id=${id}&language=en&company=${config.companyId}`)
       .then((r) => r.json())
       .then((data: ModuleDetail) => {
@@ -125,15 +150,13 @@ export function OnboardingExperience({ config }: { config: CompanyConfig }) {
         setError("Could not load this module.");
       })
       .finally(() => setLoadingModule(false));
-  }, [moduleList, index, config.companyId]);
+  }, [moduleList, index, config.companyId, config.videoModule]);
 
   useEffect(() => {
     const interval = setInterval(() => setSeconds((s) => s + 1), 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Keep our `immersive` state in sync if the user exits fullscreen via
-  // Esc or the browser's own UI, not just our own exit button.
   useEffect(() => {
     function onFsChange() {
       if (!document.fullscreenElement) setImmersive(false);
@@ -146,9 +169,6 @@ export function OnboardingExperience({ config }: { config: CompanyConfig }) {
     try {
       await document.documentElement.requestFullscreen();
     } catch (err) {
-      // Some browsers block this without a direct user gesture, or in
-      // certain iframe contexts — the immersive UI still works either way,
-      // it just won't be TRUE browser fullscreen in that case.
       console.warn("Fullscreen request failed, continuing in immersive UI only:", err);
     }
     setImmersive(true);
@@ -163,6 +183,13 @@ export function OnboardingExperience({ config }: { config: CompanyConfig }) {
 
   async function handleAcknowledge() {
     if (!current) return;
+
+    // Synthetic video step: no real module row to save progress against.
+    if (current.id === VIDEO_MODULE_ID) {
+      setAcknowledged(true);
+      return;
+    }
+
     setSaving(true);
     try {
       const res = await fetch("/api/progress", {
@@ -195,16 +222,16 @@ export function OnboardingExperience({ config }: { config: CompanyConfig }) {
   }
 
   const isLast = index === moduleList.length - 1;
+  const isVideoStep = current?.id === VIDEO_MODULE_ID;
 
   return (
     <div className="min-h-screen flex flex-col relative">
       {!immersive && <DemoMetaBar onEnterFullscreen={enterFullscreen} />}
 
-      {/* Always-visible tiny exit control, even in immersive mode — never a dead end */}
       {immersive && (
         <button
           onClick={exitFullscreen}
-          className="fixed top-2 right-2 z-60 bg-black/40 hover:bg-black/60 text-white text-xs px-2.5 py-1 rounded-none"
+          className="fixed top-2 right-2 z-[60] bg-black/40 hover:bg-black/60 text-white text-xs px-2.5 py-1 rounded-none"
         >
           ✕ Exit
         </button>
@@ -250,6 +277,20 @@ export function OnboardingExperience({ config }: { config: CompanyConfig }) {
       >
         {loadingModule || !current ? (
           <div className="text-zinc-200">Loading module…</div>
+        ) : isVideoStep && config.videoModule ? (
+          <div className="bg-white shadow-2xl max-w-3xl w-full p-8 sm:p-10">
+            <div className={`text-xs font-bold uppercase tracking-wide mb-2 ${theme.title}`}>Video</div>
+            <h1 className={`text-2xl font-bold mb-6 ${theme.title}`}>{current.title}</h1>
+            <div className="relative w-full" style={{ paddingBottom: "56.25%" /* 16:9 */ }}>
+              <iframe
+                className="absolute top-0 left-0 w-full h-full"
+                src={`https://www.youtube.com/embed/${config.videoModule.youtubeId}`}
+                title={current.title}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          </div>
         ) : (
           <div className="bg-white shadow-2xl max-w-3xl w-full p-8 sm:p-10 flex flex-col sm:flex-row gap-8 items-start">
             <div className="flex-1">
@@ -285,7 +326,7 @@ export function OnboardingExperience({ config }: { config: CompanyConfig }) {
               disabled={saving}
               className="bg-red-600 hover:bg-red-500 text-white font-bold px-6 py-2.5 text-sm disabled:opacity-60 disabled:cursor-default transition-colors"
             >
-              {saving ? "Saving…" : "I understand this module"}
+              {saving ? "Saving…" : isVideoStep ? "I've watched this" : "I understand this module"}
             </button>
           ) : (
             <div className="flex items-center gap-3">
