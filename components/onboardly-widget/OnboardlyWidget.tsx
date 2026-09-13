@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import FaqPanel from "./FaqPanel";
 
 const OB = {
@@ -14,10 +14,12 @@ const OB = {
     dotRed: "#8B3A2E",
     dotAmber: "#E0A83E",
     dotGreen: "#7BAA5A",
+    sand: "#EDE7D9",
 };
 
 const cursive = { fontFamily: "'Caveat', 'Segoe Script', cursive" };
 const body = { fontFamily: "'IBM Plex Sans', sans-serif" };
+const disp = { fontFamily: "'Space Grotesk', sans-serif" };
 
 function useOnboardlyFonts() {
     useEffect(() => {
@@ -26,9 +28,89 @@ function useOnboardlyFonts() {
         link.id = "ob-widget-fonts";
         link.rel = "stylesheet";
         link.href =
-            "https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap";
+            "https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Space+Grotesk:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap";
         document.head.appendChild(link);
     }, []);
+}
+
+function useTypewriter(lines: string[], speedMs = 22) {
+    const [displayed, setDisplayed] = useState<string[]>([]);
+    const [done, setDone] = useState(false);
+
+    useEffect(() => {
+        setDisplayed([]);
+        setDone(false);
+        let lineIndex = 0;
+        let charIndex = 0;
+        let cancelled = false;
+
+        function step() {
+            if (cancelled) return;
+            if (lineIndex >= lines.length) {
+                setDone(true);
+                return;
+            }
+            const currentLine = lines[lineIndex];
+            charIndex++;
+            setDisplayed((prev) => {
+                const next = [...prev];
+                next[lineIndex] = currentLine.slice(0, charIndex);
+                return next;
+            });
+            if (charIndex >= currentLine.length) {
+                lineIndex++;
+                charIndex = 0;
+                setTimeout(step, 350);
+            } else {
+                setTimeout(step, speedMs);
+            }
+        }
+
+        step();
+        return () => {
+            cancelled = true;
+        };
+    }, [lines, speedMs]);
+
+    return { displayed, done };
+}
+
+const TOP_LANGUAGES = [
+    { code: "en", label: "English" },
+    { code: "zh", label: "Mandarin" },
+    { code: "ar", label: "Arabic" },
+    { code: "vi", label: "Vietnamese" },
+    { code: "pa", label: "Punjabi" },
+    { code: "hi", label: "Hindi" },
+];
+
+const MORE_LANGUAGES = [
+    { code: "af", label: "Afrikaans" }, { code: "hy", label: "Armenian" },
+    { code: "bn", label: "Bengali" }, { code: "bg", label: "Bulgarian" },
+    { code: "ca", label: "Catalan" }, { code: "hr", label: "Croatian" },
+    { code: "cs", label: "Czech" }, { code: "da", label: "Danish" },
+    { code: "nl", label: "Dutch" }, { code: "fil", label: "Filipino" },
+    { code: "fi", label: "Finnish" }, { code: "fr", label: "French" },
+    { code: "ka", label: "Georgian" }, { code: "de", label: "German" },
+    { code: "el", label: "Greek" }, { code: "gu", label: "Gujarati" },
+    { code: "he", label: "Hebrew" }, { code: "hu", label: "Hungarian" },
+    { code: "id", label: "Indonesian" }, { code: "it", label: "Italian" },
+    { code: "ja", label: "Japanese" }, { code: "kn", label: "Kannada" },
+    { code: "ko", label: "Korean" }, { code: "ms", label: "Malay" },
+    { code: "ml", label: "Malayalam" }, { code: "mr", label: "Marathi" },
+    { code: "ne", label: "Nepali" }, { code: "no", label: "Norwegian" },
+    { code: "fa", label: "Persian" }, { code: "pl", label: "Polish" },
+    { code: "pt", label: "Portuguese" }, { code: "ro", label: "Romanian" },
+    { code: "ru", label: "Russian" }, { code: "es", label: "Spanish" },
+    { code: "sw", label: "Swahili" }, { code: "sv", label: "Swedish" },
+    { code: "ta", label: "Tamil" }, { code: "te", label: "Telugu" },
+    { code: "th", label: "Thai" }, { code: "tr", label: "Turkish" },
+    { code: "uk", label: "Ukrainian" }, { code: "ur", label: "Urdu" },
+].sort((a, b) => a.label.localeCompare(b.label));
+
+const ALL_LANGUAGES = [...TOP_LANGUAGES, ...MORE_LANGUAGES];
+function languageLabel(code: string) {
+    return ALL_LANGUAGES.find((l) => l.code === code)?.label ?? "English";
 }
 
 const IDLE_BARS = [10, 22, 14, 26, 12, 20, 16, 24, 11, 18];
@@ -39,7 +121,6 @@ const BAR_WEIGHTS = [0.5, 0.8, 0.65, 1, 0.55, 0.9, 0.6, 0.95, 0.5, 0.75];
 function useMicLevels(active: boolean) {
     const [levels, setLevels] = useState<number[]>(IDLE_BARS);
     const [micError, setMicError] = useState<string | null>(null);
-
     const audioCtxRef = useRef<AudioContext | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
@@ -56,9 +137,7 @@ function useMicLevels(active: boolean) {
             setLevels(IDLE_BARS);
             return;
         }
-
         let cancelled = false;
-
         async function start() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -67,29 +146,24 @@ function useMicLevels(active: boolean) {
                     return;
                 }
                 streamRef.current = stream;
-
                 const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
                 audioCtxRef.current = audioCtx;
-
                 const source = audioCtx.createMediaStreamSource(stream);
                 const analyser = audioCtx.createAnalyser();
                 analyser.fftSize = 256;
                 source.connect(analyser);
                 analyserRef.current = analyser;
-
                 const dataArray = new Uint8Array(analyser.fftSize);
 
                 function tick() {
                     if (!analyserRef.current) return;
                     analyserRef.current.getByteTimeDomainData(dataArray);
-
                     let sumSquares = 0;
                     for (let i = 0; i < dataArray.length; i++) {
                         const normalized = (dataArray[i] - 128) / 128;
                         sumSquares += normalized * normalized;
                     }
                     const volume = Math.sqrt(sumSquares / dataArray.length);
-
                     const next = BAR_WEIGHTS.map((weight) => {
                         const height = MIN_BAR_HEIGHT + volume * weight * (MAX_BAR_HEIGHT - MIN_BAR_HEIGHT) * 3;
                         return Math.round(Math.min(MAX_BAR_HEIGHT, Math.max(MIN_BAR_HEIGHT, height)));
@@ -97,16 +171,13 @@ function useMicLevels(active: boolean) {
                     setLevels(next);
                     rafRef.current = requestAnimationFrame(tick);
                 }
-
                 tick();
             } catch (err) {
                 console.error("Mic access failed", err);
                 setMicError("Couldn't access the microphone. Check your browser permissions.");
             }
         }
-
         start();
-
         return () => {
             cancelled = true;
             if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -118,47 +189,73 @@ function useMicLevels(active: boolean) {
     return { levels, micError };
 }
 
-function Waveform({
-    levels,
-    listening,
-    onClick,
-}: {
-    levels: number[];
-    listening: boolean;
-    onClick: () => void;
-}) {
+function Waveform({ levels, listening, onClick }: { levels: number[]; listening: boolean; onClick: () => void }) {
     return (
         <button
             onClick={onClick}
             aria-label={listening ? "Stop listening" : "Click to speak"}
-            style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 5,
-                height: 48,
-                width: "100%",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                padding: "0 8px",
-            }}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5, height: 48, width: "100%", background: "none", border: "none", cursor: "pointer", padding: "0 8px" }}
         >
             {levels.map((h, i) => (
-                <div
-                    key={i}
-                    style={{
-                        width: 3,
-                        height: h,
-                        borderRadius: 2,
-                        background: listening ? OB.dotRed : OB.text,
-                        transition: listening ? "none" : "height 0.15s ease",
-                    }}
-                />
+                <div key={i} style={{ width: 3, height: h, borderRadius: 2, background: listening ? OB.dotRed : OB.text, transition: listening ? "none" : "height 0.15s ease" }} />
             ))}
         </button>
     );
 }
+
+function LanguagePicker({ onSelect }: { onSelect: (code: string) => void }) {
+    const [query, setQuery] = useState("");
+    const filtered = useMemo(
+        () => (query.trim() ? MORE_LANGUAGES.filter((l) => l.label.toLowerCase().includes(query.toLowerCase())) : MORE_LANGUAGES),
+        [query]
+    );
+
+    return (
+        <div style={{ padding: "0 18px 16px", flex: 1, overflowY: "auto" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+                {TOP_LANGUAGES.map((lang) => (
+                    <button
+                        key={lang.code}
+                        onClick={() => onSelect(lang.code)}
+                        style={{ ...body, fontSize: 13, fontWeight: 600, padding: "10px 8px", borderRadius: 8, border: `1.5px solid ${OB.border}`, background: "#fff", color: OB.text, cursor: "pointer" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = OB.sand)}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
+                    >
+                        {lang.label}
+                    </button>
+                ))}
+            </div>
+
+            <p style={{ ...body, fontSize: 10.5, color: OB.textMuted, textTransform: "uppercase", letterSpacing: 0.4, margin: "0 0 8px" }}>
+                More languages
+            </p>
+            <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search…"
+                style={{ ...body, width: "100%", boxSizing: "border-box", padding: "9px 12px", borderRadius: 999, border: `1.5px solid ${OB.border}`, fontSize: 12.5, marginBottom: 8 }}
+            />
+            <div style={{ maxHeight: 130, overflowY: "auto", border: `1px solid ${OB.border}`, borderRadius: 8 }}>
+                {filtered.map((lang) => (
+                    <button
+                        key={lang.code}
+                        onClick={() => onSelect(lang.code)}
+                        style={{ ...body, display: "block", width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 12.5, color: OB.text, background: "none", border: "none", borderBottom: `1px solid ${OB.sand}`, cursor: "pointer" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = OB.sand)}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+                    >
+                        {lang.label}
+                    </button>
+                ))}
+                {filtered.length === 0 && (
+                    <div style={{ ...body, fontSize: 12, color: OB.textMuted, padding: "10px 12px" }}>No matches.</div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+type Screen = "welcome" | "language" | "main";
 
 interface OnboardlyWidgetProps {
     language?: string;
@@ -167,21 +264,38 @@ interface OnboardlyWidgetProps {
     onVoiceCaptured?: (audioBlob: Blob) => void;
 }
 
-export default function OnboardlyWidget({
-    language,
-    moduleContent,
-    onAskQuestion,
-    onVoiceCaptured,
-}: OnboardlyWidgetProps) {
+const WELCOME_LINES = [
+    "Hi, I'm your Onboardly assistant.",
+    "I'll walk you through your training and answer any questions along the way.",
+];
+
+export default function OnboardlyWidget({ moduleContent, onAskQuestion, onVoiceCaptured }: OnboardlyWidgetProps) {
     useOnboardlyFonts();
 
     const [expanded, setExpanded] = useState(true);
+    const [screen, setScreen] = useState<Screen>("welcome");
+    const [selectedLanguage, setSelectedLanguage] = useState("en");
     const [view, setView] = useState<"ask" | "faq">("ask");
     const [question, setQuestion] = useState("");
     const [listening, setListening] = useState(false);
 
-    const { levels, micError } = useMicLevels(listening);
+    useEffect(() => {
+        const saved = typeof window !== "undefined" ? localStorage.getItem("onboardly_language") : null;
+        if (saved) {
+            setSelectedLanguage(saved);
+            setScreen("main");
+        }
+    }, []);
 
+    function chooseLanguage(code: string) {
+        setSelectedLanguage(code);
+        localStorage.setItem("onboardly_language", code);
+        setScreen("main");
+    }
+
+    const { displayed, done } = useTypewriter(WELCOME_LINES);
+
+    const { levels, micError } = useMicLevels(listening);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
 
@@ -190,14 +304,15 @@ export default function OnboardlyWidget({
     const [dragging, setDragging] = useState(false);
     const dragMovedRef = useRef(false);
 
+    const [size, setSize] = useState({ width: 340, height: 460 });
+    const resizeStart = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
+    const [resizing, setResizing] = useState(false);
+
     useEffect(() => {
         if (pos) return;
-        const width = expanded ? 340 : 56;
-        const height = expanded ? 420 : 56;
-        setPos({
-            x: window.innerWidth - width - 28,
-            y: window.innerHeight - height - 28,
-        });
+        const w = expanded ? size.width : 56;
+        const h = expanded ? size.height : 56;
+        setPos({ x: window.innerWidth - w - 28, y: window.innerHeight - h - 28 });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -229,16 +344,44 @@ export default function OnboardlyWidget({
         };
     }, [dragging]);
 
+    const onResizeStart = useCallback(
+        (e: React.MouseEvent) => {
+            e.stopPropagation();
+            resizeStart.current = { x: e.clientX, y: e.clientY, w: size.width, h: size.height };
+            setResizing(true);
+        },
+        [size]
+    );
+
+    useEffect(() => {
+        if (!resizing) return;
+        function onMove(e: MouseEvent) {
+            if (!resizeStart.current) return;
+            const dx = e.clientX - resizeStart.current.x;
+            const dy = e.clientY - resizeStart.current.y;
+            setSize({
+                width: Math.min(520, Math.max(280, resizeStart.current.w + dx)),
+                height: Math.min(680, Math.max(340, resizeStart.current.h + dy)),
+            });
+        }
+        function onUp() {
+            setResizing(false);
+        }
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", onUp);
+        return () => {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+        };
+    }, [resizing]);
+
     async function toggleListening() {
         if (listening) {
             setListening(false);
             const recorder = mediaRecorderRef.current;
-            if (recorder && recorder.state !== "inactive") {
-                recorder.stop();
-            }
+            if (recorder && recorder.state !== "inactive") recorder.stop();
             return;
         }
-
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             chunksRef.current = [];
@@ -278,20 +421,9 @@ export default function OnboardlyWidget({
                 onMouseDown={onDragStart}
                 aria-label="Open Onboardly assistant"
                 style={{
-                    position: "fixed",
-                    left: pos.x,
-                    top: pos.y,
-                    width: 56,
-                    height: 56,
-                    borderRadius: "50%",
-                    background: OB.cream,
-                    border: `1px solid ${OB.border}`,
-                    boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
-                    color: OB.text,
-                    cursor: dragging ? "grabbing" : "grab",
-                    ...cursive,
-                    fontSize: 20,
-                    fontWeight: 700,
+                    position: "fixed", left: pos.x, top: pos.y, width: 56, height: 56, borderRadius: "50%",
+                    background: OB.cream, border: `1px solid ${OB.border}`, boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+                    color: OB.text, cursor: dragging ? "grabbing" : "grab", ...cursive, fontSize: 20, fontWeight: 700,
                 }}
             >
                 OB
@@ -302,110 +434,140 @@ export default function OnboardlyWidget({
     return (
         <div
             style={{
-                position: "fixed",
-                left: pos.x,
-                top: pos.y,
-                width: 340,
-                background: OB.cream,
-                border: `1px solid ${OB.border}`,
-                borderRadius: 14,
-                overflow: "hidden",
-                boxShadow: "0 8px 28px rgba(0,0,0,0.10)",
+                position: "fixed", left: pos.x, top: pos.y, width: size.width, height: size.height,
+                background: OB.cream, border: `1px solid ${OB.border}`, borderRadius: 14, overflow: "hidden",
+                boxShadow: "0 8px 28px rgba(0,0,0,0.10)", display: "flex", flexDirection: "column",
             }}
         >
             <div
                 onMouseDown={onDragStart}
-                style={{
-                    padding: "16px 18px 14px",
-                    cursor: dragging ? "grabbing" : "grab",
-                    userSelect: "none",
-                    position: "relative",
-                }}
+                style={{ padding: "14px 16px 10px", cursor: dragging ? "grabbing" : "grab", userSelect: "none", position: "relative", flexShrink: 0 }}
             >
-                <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-                    <span style={{ width: 11, height: 11, borderRadius: "50%", background: OB.dotRed }} />
-                    <button
-                        onClick={() => setExpanded(false)}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        aria-label="Minimize assistant"
-                        style={{
-                            width: 11,
-                            height: 11,
-                            borderRadius: "50%",
-                            background: OB.dotAmber,
-                            border: "none",
-                            padding: 0,
-                            cursor: "pointer",
-                        }}
-                    />
-                    <span style={{ width: 11, height: 11, borderRadius: "50%", background: OB.dotGreen }} />
-                </div>
-
                 <button
-                    onClick={() => setView(view === "faq" ? "ask" : "faq")}
+                    onClick={() => setExpanded(false)}
                     onMouseDown={(e) => e.stopPropagation()}
-                    aria-label="Frequently asked questions"
+                    aria-label="Minimize assistant"
                     style={{
-                        position: "absolute",
-                        top: 16,
-                        right: 16,
-                        width: 26,
-                        height: 26,
-                        borderRadius: "50%",
-                        border: `1.5px solid ${OB.dotRed}`,
-                        background: view === "faq" ? OB.dotRed : "none",
-                        fontSize: 13,
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
+                        position: "absolute", top: 14, left: 16, width: 22, height: 22, borderRadius: "50%",
+                        border: `1.5px solid ${OB.border}`, background: "none", color: OB.textMuted, fontSize: 13,
+                        cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                     }}
                 >
-                    <span style={{ color: view === "faq" ? OB.cream : OB.dotRed }}>?</span>
+                    ×
                 </button>
 
+                {screen === "main" && (
+                    <div style={{ position: "absolute", top: 14, right: 16, display: "flex", gap: 6 }}>
+                        <button
+                            onClick={() => setScreen("language")}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            aria-label="Change language"
+                            title="Change language"
+                            style={{
+                                width: 26, height: 26, borderRadius: "50%", border: `1.5px solid ${OB.border}`,
+                                background: "none", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                        >
+                            🌐
+                        </button>
+                        <button
+                            onClick={() => setView(view === "faq" ? "ask" : "faq")}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            aria-label="Frequently asked questions"
+                            style={{
+                                width: 26, height: 26, borderRadius: "50%", border: `1.5px solid ${OB.dotRed}`,
+                                background: view === "faq" ? OB.dotRed : "none", fontSize: 13, fontWeight: 700, cursor: "pointer",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                        >
+                            <span style={{ color: view === "faq" ? OB.cream : OB.dotRed }}>?</span>
+                        </button>
+                    </div>
+                )}
+
                 <div style={{ textAlign: "center" }}>
-                    <span style={{ ...cursive, fontSize: 30, color: OB.text, borderBottom: `2px solid ${OB.text}`, paddingBottom: 2 }}>
+                    <span style={{ ...cursive, fontSize: 26, color: OB.text, borderBottom: `2px solid ${OB.text}`, paddingBottom: 2 }}>
                         OnBoardly
                     </span>
                 </div>
             </div>
 
-            {view === "faq" ? (
-                <FaqPanel />
-            ) : (
-                <>
-                    <div style={{ padding: "16px 18px 6px" }}>
-                        <Waveform levels={levels} listening={listening} onClick={toggleListening} />
-                        <p style={{ ...body, fontSize: 11, color: listening ? OB.dotRed : OB.textMuted, textAlign: "center", margin: "4px 0 0", fontWeight: listening ? 600 : 400 }}>
-                            {micError ? micError : listening ? "Listening… click to stop" : "Click to speak"}
-                        </p>
+            {screen === "welcome" && (
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 24px 20px", overflowY: "auto" }}>
+                    <div
+                        style={{
+                            width: 64, height: 64, borderRadius: "50%", background: OB.sand, border: `1.5px solid ${OB.border}`,
+                            display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 18, ...cursive, fontSize: 24, color: OB.text,
+                        }}
+                    >
+                        OB
                     </div>
-
-                    <form onSubmit={handleSubmit} style={{ padding: "14px 18px 8px" }}>
-                        <input
-                            value={question}
-                            onChange={(e) => setQuestion(e.target.value)}
-                            placeholder="Type to ask questions…"
-                            style={{
-                                ...body,
-                                width: "100%",
-                                boxSizing: "border-box",
-                                padding: "12px 16px",
-                                borderRadius: 999,
-                                border: `1.5px solid ${OB.text}`,
-                                fontSize: 14,
-                                color: OB.text,
-                            }}
-                        />
-                    </form>
-
-                    <p style={{ ...body, fontSize: 10.5, color: OB.textMuted, textAlign: "center", margin: "6px 0 16px" }}>
-                        Brought to you by OnBoardly
-                    </p>
-                </>
+                    <div style={{ minHeight: 70, textAlign: "center", marginBottom: 20 }}>
+                        {WELCOME_LINES.map((_, i) => (
+                            <p key={i} style={{ ...body, fontSize: 13.5, color: OB.text, lineHeight: 1.6, margin: "0 0 8px" }}>
+                                {displayed[i] || "\u00A0"}
+                            </p>
+                        ))}
+                    </div>
+                    <button
+                        onClick={() => setScreen("language")}
+                        disabled={!done}
+                        style={{
+                            ...disp, background: OB.text, color: "#fff", border: "none", borderRadius: 8,
+                            padding: "11px 28px", fontSize: 13.5, fontWeight: 600, cursor: done ? "pointer" : "default",
+                            opacity: done ? 1 : 0.4, transition: "opacity 0.2s",
+                        }}
+                    >
+                        Continue
+                    </button>
+                </div>
             )}
+
+            {screen === "language" && (
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                    <LanguagePicker onSelect={chooseLanguage} />
+                </div>
+            )}
+
+            {screen === "main" && (
+                view === "faq" ? (
+                    <div style={{ flex: 1, overflowY: "auto" }}>
+                        <FaqPanel />
+                    </div>
+                ) : (
+                    <>
+                        <div style={{ padding: "12px 18px 4px", flexShrink: 0 }}>
+                            <Waveform levels={levels} listening={listening} onClick={toggleListening} />
+                            <p style={{ ...body, fontSize: 11, color: listening ? OB.dotRed : OB.textMuted, textAlign: "center", margin: "4px 0 0", fontWeight: listening ? 600 : 400 }}>
+                                {micError ? micError : listening ? "Listening… click to stop" : "Click to speak"}
+                            </p>
+                        </div>
+
+                        <div style={{ flex: 1 }} />
+
+                        <form onSubmit={handleSubmit} style={{ padding: "10px 18px 6px", flexShrink: 0 }}>
+                            <input
+                                value={question}
+                                onChange={(e) => setQuestion(e.target.value)}
+                                placeholder="Type to ask questions…"
+                                style={{ ...body, width: "100%", boxSizing: "border-box", padding: "12px 16px", borderRadius: 999, border: `1.5px solid ${OB.text}`, fontSize: 14, color: OB.text }}
+                            />
+                        </form>
+
+                        <p style={{ ...body, fontSize: 10, color: OB.textMuted, textAlign: "center", margin: "4px 0 10px", flexShrink: 0 }}>
+                            Speaking {languageLabel(selectedLanguage)} · Brought to you by OnBoardly
+                        </p>
+                    </>
+                )
+            )}
+
+            <div
+                onMouseDown={onResizeStart}
+                style={{
+                    position: "absolute", right: 2, bottom: 2, width: 16, height: 16, cursor: "nwse-resize",
+                    background: `linear-gradient(135deg, transparent 50%, ${OB.border} 50%)`, borderRadius: 2,
+                }}
+            />
         </div>
     );
 }
