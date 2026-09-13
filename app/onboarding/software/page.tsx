@@ -15,8 +15,8 @@ const config: CompanyConfig = {
   avatarUrl: "/user (1).png",
   prevArrowUrl: "/left.png",
   nextArrowUrl: "/right.png",
-  moduleImageUrl: "/software-image.jpg",
-  backgroundImageUrl: "/software-office-bg.jpg",
+  moduleImageUrl: "/software-image.png",
+  backgroundImageUrl: "/software-office-bg.jfif",
 };
 
 export default function SoftwareOnboardingPage() {
