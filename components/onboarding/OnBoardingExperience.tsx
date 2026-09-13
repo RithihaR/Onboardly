@@ -15,7 +15,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import OnboardlyWidget from "@/components/onboardly-widget/OnboardlyWidget";
 
@@ -120,6 +120,12 @@ export function OnboardingExperience({ config }: { config: CompanyConfig }) {
   const [freeTextAnswer, setFreeTextAnswer] = useState("");
   const [quizError, setQuizError] = useState<string | null>(null);
   const [checkingAnswer, setCheckingAnswer] = useState(false);
+  // Result of the most recent submit, so the chosen option can be
+  // highlighted pastel green/red with a "Correct!"/"Incorrect!" label.
+  // Cleared whenever the learner changes their selection so a stale
+  // highlight doesn't linger on an answer they haven't resubmitted yet.
+  const [answerFeedback, setAnswerFeedback] = useState<"correct" | "incorrect" | null>(null);
+  const advanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetch(`/api/modules?company=${config.companyId}`)
@@ -185,6 +191,11 @@ export function OnboardingExperience({ config }: { config: CompanyConfig }) {
     setSelectedBool(null);
     setFreeTextAnswer("");
     setQuizError(null);
+    setAnswerFeedback(null);
+    if (advanceTimeoutRef.current) {
+      clearTimeout(advanceTimeoutRef.current);
+      advanceTimeoutRef.current = null;
+    }
 
     fetch(`/api/questions?moduleId=${id}`)
       .then((r) => r.json())
@@ -202,6 +213,12 @@ export function OnboardingExperience({ config }: { config: CompanyConfig }) {
   useEffect(() => {
     const interval = setInterval(() => setSeconds((s) => s + 1), 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -282,8 +299,20 @@ export function OnboardingExperience({ config }: { config: CompanyConfig }) {
       });
       const data = await res.json();
       if (data.correct) {
+        setAnswerFeedback("correct");
         await handleAcknowledge();
+        // Let the learner see the "Correct!" highlight for a beat, then
+        // move on to the next module (whose own question, if any, loads
+        // via the module-change effect above). On the last module there's
+        // nowhere to advance to — the footer's "All modules complete"
+        // state takes over instead.
+        if (index < moduleList.length - 1) {
+          advanceTimeoutRef.current = setTimeout(() => {
+            handleNext();
+          }, 1200);
+        }
       } else {
+        setAnswerFeedback("incorrect");
         setQuizError("Not quite — try again, or go back to the module to review.");
       }
     } catch (err) {
@@ -387,67 +416,110 @@ export function OnboardingExperience({ config }: { config: CompanyConfig }) {
 
             {question.type === "multiple_choice" && (
               <div className="flex flex-col gap-2">
-                {question.options.map((opt, i) => (
-                  <label
-                    key={i}
-                    className="flex items-center gap-3 border border-zinc-300 rounded px-3 py-2 cursor-pointer hover:bg-zinc-50"
-                  >
-                    <input
-                      type="radio"
-                      name="quiz-option"
-                      checked={selectedOption === i}
-                      onChange={() => setSelectedOption(i)}
-                    />
-                    <span className="text-zinc-700 text-sm">{opt}</span>
-                  </label>
-                ))}
+                {question.options.map((opt, i) => {
+                  const isPicked = selectedOption === i;
+                  const pickedStyle =
+                    isPicked && answerFeedback === "correct"
+                      ? "bg-green-100 border-green-400"
+                      : isPicked && answerFeedback === "incorrect"
+                      ? "bg-red-100 border-red-400"
+                      : "border-zinc-300 hover:bg-zinc-50";
+                  return (
+                    <label
+                      key={i}
+                      className={`flex items-center gap-3 border rounded px-3 py-2 cursor-pointer transition-colors ${pickedStyle}`}
+                    >
+                      <input
+                        type="radio"
+                        name="quiz-option"
+                        checked={isPicked}
+                        disabled={answerFeedback === "correct"}
+                        onChange={() => {
+                          setSelectedOption(i);
+                          setAnswerFeedback(null);
+                          setQuizError(null);
+                        }}
+                      />
+                      <span className="text-zinc-700 text-sm">{opt}</span>
+                    </label>
+                  );
+                })}
               </div>
             )}
 
             {question.type === "true_false" && (
               <div className="flex gap-3">
-                <button
-                  onClick={() => setSelectedBool(true)}
-                  className={`px-6 py-2 text-sm font-medium border rounded ${
-                    selectedBool === true ? "bg-zinc-900 text-white border-zinc-900" : "border-zinc-300 text-zinc-700"
-                  }`}
-                >
-                  True
-                </button>
-                <button
-                  onClick={() => setSelectedBool(false)}
-                  className={`px-6 py-2 text-sm font-medium border rounded ${
-                    selectedBool === false ? "bg-zinc-900 text-white border-zinc-900" : "border-zinc-300 text-zinc-700"
-                  }`}
-                >
-                  False
-                </button>
+                {[true, false].map((val) => {
+                  const isPicked = selectedBool === val;
+                  const pickedStyle =
+                    isPicked && answerFeedback === "correct"
+                      ? "bg-green-100 border-green-400 text-zinc-900"
+                      : isPicked && answerFeedback === "incorrect"
+                      ? "bg-red-100 border-red-400 text-zinc-900"
+                      : isPicked
+                      ? "bg-zinc-900 text-white border-zinc-900"
+                      : "border-zinc-300 text-zinc-700";
+                  return (
+                    <button
+                      key={String(val)}
+                      onClick={() => {
+                        setSelectedBool(val);
+                        setAnswerFeedback(null);
+                        setQuizError(null);
+                      }}
+                      disabled={answerFeedback === "correct"}
+                      className={`px-6 py-2 text-sm font-medium border rounded transition-colors ${pickedStyle}`}
+                    >
+                      {val ? "True" : "False"}
+                    </button>
+                  );
+                })}
               </div>
             )}
 
             {question.type === "free_text" && (
               <textarea
                 value={freeTextAnswer}
-                onChange={(e) => setFreeTextAnswer(e.target.value)}
+                onChange={(e) => {
+                  setFreeTextAnswer(e.target.value);
+                  setAnswerFeedback(null);
+                  setQuizError(null);
+                }}
+                disabled={answerFeedback === "correct"}
                 rows={4}
                 placeholder="Type your answer…"
-                className="border border-zinc-300 rounded px-3 py-2 text-sm text-zinc-700"
+                className={`border rounded px-3 py-2 text-sm text-zinc-700 transition-colors ${
+                  answerFeedback === "correct"
+                    ? "bg-green-100 border-green-400"
+                    : answerFeedback === "incorrect"
+                    ? "bg-red-100 border-red-400"
+                    : "border-zinc-300"
+                }`}
               />
             )}
 
-            {quizError && <div className="text-red-600 text-sm">{quizError}</div>}
+            {answerFeedback === "correct" && (
+              <div className="text-green-700 text-sm font-semibold">✓ Correct!</div>
+            )}
+            {answerFeedback === "incorrect" && quizError && (
+              <div className="text-red-700 text-sm font-semibold">✗ Incorrect! {quizError}</div>
+            )}
+            {answerFeedback !== "incorrect" && quizError && (
+              <div className="text-red-600 text-sm">{quizError}</div>
+            )}
 
             <div className="flex items-center gap-4">
               <button
                 onClick={handleQuizSubmit}
-                disabled={!quizAnswerProvided || checkingAnswer}
+                disabled={!quizAnswerProvided || checkingAnswer || answerFeedback === "correct"}
                 className="bg-red-600 hover:bg-red-500 text-white font-bold px-6 py-2.5 text-sm disabled:opacity-60 disabled:cursor-default transition-colors"
               >
-                {checkingAnswer ? "Checking…" : "Submit answer"}
+                {checkingAnswer ? "Checking…" : answerFeedback === "correct" ? "Moving on…" : "Submit answer"}
               </button>
               <button
                 onClick={() => setModuleView("content")}
-                className="text-sm text-zinc-500 underline hover:text-zinc-700"
+                disabled={answerFeedback === "correct"}
+                className="text-sm text-zinc-500 underline hover:text-zinc-700 disabled:opacity-40 disabled:cursor-default"
               >
                 ← Back to module
               </button>
