@@ -1,22 +1,31 @@
-// Alternative to page.tsx — keeps a visible landing page with a button,
-// instead of redirecting automatically. Rename this to page.tsx if you
-// want this version instead of the auto-redirect.
-
+// app/page.tsx
 import Link from "next/link";
+import { SiteNav } from "@/components/layout/SiteNav";
 
 export default function Home() {
   return (
-    <div style={{ padding: 40, fontFamily: "sans-serif" }}>
-      <div>Onboardly backend running</div>
-      <Link
-        href="/onboarding"
-        style={{
-          display: "inline-block", marginTop: 16, background: "#1A1F26", color: "#fff",
-          padding: "10px 18px", borderRadius: 6, textDecoration: "none", fontWeight: 700,
-        }}
-      >
-        Go to onboarding →
-      </Link>
+    <div className="min-h-screen bg-white">
+      <SiteNav />
+
+      <main className="max-w-3xl mx-auto px-8 py-24 text-center">
+        <div className="text-orange-600 text-sm font-semibold tracking-wide uppercase mb-4">
+          For businesses onboarding new employees
+        </div>
+        <h1 className="text-5xl font-bold text-zinc-900 mb-6 leading-tight">
+          Onboarding that gets embedded, not adopted.
+        </h1>
+        <p className="text-lg text-zinc-600 mb-10 max-w-xl mx-auto">
+          Onboardly drops into a business's existing onboarding site — no migration,
+          no new platform for employees to learn. See it running as if it were
+          already part of two real companies' onboarding pages.
+        </p>
+        <Link
+          href="/demo"
+          className="inline-block bg-orange-600 hover:bg-orange-500 text-white font-bold px-8 py-4 text-base transition-colors"
+        >
+          View the demo →
+        </Link>
+      </main>
     </div>
   );
 }
