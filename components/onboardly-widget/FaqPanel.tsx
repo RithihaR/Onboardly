@@ -1,55 +1,111 @@
-// this file is the FaqPanel.tsx
-// ../../components/onboardly-widget/FaqPanel.tsx is this file 
-
-
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 
 const OB = {
-    border: "#E4DFD3",
+    border: "#D7E0C9",
     cream: "#FFFFFF",
-    text: "#2B2620",
-    textMuted: "#8A8271",
-    dotRed: "#8B3A2E",
+    text: "#16233D",
+    textMuted: "#5C6B7A",
+    sand: "#DDE5D0",
 };
 
-const body = { fontFamily: "'IBM Plex Sans', sans-serif" };
+const body = { fontFamily: "'Inter', sans-serif" };
 
-const FAQS = [
-    {
-        module: "PPE & General Safety",
-        q: "Do I need gloves just for lifting boxes?",
-        a: "Gloves are required for cutting, grinding, or chemical handling — general lifting doesn't need them unless your supervisor says otherwise.",
-    },
-    {
-        module: "Equipment Safety",
-        q: "What should I do if equipment stops working mid-task?",
-        a: "Stop operating it immediately, apply the shut-off if applicable, and report it to your supervisor. Don't attempt a repair yourself.",
-    },
-    {
-        module: "Pay & Entitlements",
-        q: "If I think I've been underpaid, who do I talk to?",
-        a: "Raise it with HR or the Fair Work Ombudsman — this is a standard part of your entitlements, regardless of visa status.",
-    },
-    {
-        module: "PPE & General Safety",
-        q: "My safety boots are worn out — do I pay for replacements?",
-        a: "No, report worn or damaged PPE to your supervisor; replacement is provided by the site.",
-    },
-];
+interface FaqEntry {
+    q: string;
+    a: string;
+}
 
-export default function FaqPanel() {
+// Words too common/short to be useful for matching a question by keyword.
+const STOPWORDS = new Set([
+    "the", "a", "an", "is", "are", "do", "does", "did", "i", "you", "we",
+    "it", "to", "for", "of", "in", "on", "at", "and", "or", "my", "me",
+    "what", "why", "how", "when", "where", "just", "if", "this", "that",
+]);
+
+function keywordsOf(text: string): string[] {
+    return text
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter((w) => w.length > 2 && !STOPWORDS.has(w));
+}
+
+// In-memory cache so switching FAQ tabs or reopening the panel for the same
+// module doesn't re-trigger a Gemini call every time.
+const faqCache = new Map<string, FaqEntry[]>();
+
+interface FaqPanelProps {
+    moduleContent?: string;
+    language?: string;
+}
+
+export default function FaqPanel({ moduleContent, language = "en" }: FaqPanelProps) {
     const [query, setQuery] = useState("");
+    const [faqs, setFaqs] = useState<FaqEntry[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const requestedFor = useRef<string | null>(null);
 
-    const filtered = FAQS.filter(
-        (f) =>
-            f.q.toLowerCase().includes(query.toLowerCase()) ||
-            f.module.toLowerCase().includes(query.toLowerCase())
-    );
+    useEffect(() => {
+        if (!moduleContent || !moduleContent.trim()) {
+            setFaqs([]);
+            return;
+        }
+
+        const cacheKey = `${language}::${moduleContent}`;
+        const cached = faqCache.get(cacheKey);
+        if (cached) {
+            setFaqs(cached);
+            return;
+        }
+
+        if (requestedFor.current === cacheKey) return; // already in flight
+        requestedFor.current = cacheKey;
+
+        setLoading(true);
+        setError(null);
+        fetch("/api/faqs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content: moduleContent, language }),
+        })
+            .then((r) => r.json())
+            .then((data) => {
+                if (data.error) throw new Error(data.error);
+                const result: FaqEntry[] = data.faqs || [];
+                faqCache.set(cacheKey, result);
+                setFaqs(result);
+            })
+            .catch((err) => {
+                console.error("Failed to load FAQs", err);
+                setError("Couldn't load FAQs for this module.");
+            })
+            .finally(() => setLoading(false));
+    }, [moduleContent, language]);
+
+    // Keyword-overlap matching instead of requiring the whole typed phrase to
+    // appear verbatim — so "why do I need gloves" matches a FAQ containing
+    // "gloves" even though the wording differs.
+    const filtered = useMemo(() => {
+        if (!query.trim()) return faqs;
+        const queryWords = keywordsOf(query);
+        if (queryWords.length === 0) return faqs;
+
+        return faqs
+            .map((f) => {
+                const haystack = keywordsOf(`${f.q} ${f.a}`);
+                const overlap = queryWords.filter((w) => haystack.includes(w)).length;
+                return { f, overlap };
+            })
+            .filter((x) => x.overlap > 0)
+            .sort((a, b) => b.overlap - a.overlap)
+            .map((x) => x.f);
+    }, [query, faqs]);
 
     return (
-        <div style={{ padding: "0 18px 16px" }}>
+        <div style={{ padding: "12px 18px 16px" }}>
             <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -60,7 +116,7 @@ export default function FaqPanel() {
                     boxSizing: "border-box",
                     padding: "10px 14px",
                     borderRadius: 999,
-                    border: `1.5px solid ${OB.border}`,
+                    border: `1.5px solid ${OB.text}`,
                     fontSize: 13,
                     color: OB.text,
                     marginBottom: 12,
@@ -76,40 +132,44 @@ export default function FaqPanel() {
                     overflowY: "auto",
                 }}
             >
-                {filtered.map((f, i) => (
-                    <div
-                        key={i}
-                        style={{
-                            background: OB.cream,
-                            border: `1px solid ${OB.border}`,
-                            borderRadius: 10,
-                            padding: "10px 12px",
-                        }}
-                    >
+                {loading && (
+                    <div style={{ ...body, fontSize: 12, color: OB.textMuted, padding: "8px 0" }}>
+                        Generating FAQs for this module…
+                    </div>
+                )}
+                {error && (
+                    <div style={{ ...body, fontSize: 12, color: OB.textMuted, padding: "8px 0" }}>
+                        {error}
+                    </div>
+                )}
+                {!loading &&
+                    !error &&
+                    filtered.map((f, i) => (
                         <div
+                            key={i}
                             style={{
-                                ...body,
-                                fontSize: 9.5,
-                                fontWeight: 700,
-                                color: OB.dotRed,
-                                textTransform: "uppercase",
-                                marginBottom: 3,
-                                letterSpacing: 0.3,
+                                background: OB.sand,
+                                border: `1px solid ${OB.border}`,
+                                borderRadius: 10,
+                                padding: "10px 12px",
                             }}
                         >
-                            {f.module}
+                            <div style={{ ...body, fontWeight: 600, fontSize: 12.5, color: OB.text, marginBottom: 4 }}>
+                                {f.q}
+                            </div>
+                            <div style={{ ...body, fontSize: 11.5, color: OB.textMuted, lineHeight: 1.45 }}>
+                                {f.a}
+                            </div>
                         </div>
-                        <div style={{ ...body, fontWeight: 600, fontSize: 12.5, color: OB.text, marginBottom: 4 }}>
-                            {f.q}
-                        </div>
-                        <div style={{ ...body, fontSize: 11.5, color: OB.textMuted, lineHeight: 1.45 }}>
-                            {f.a}
-                        </div>
-                    </div>
-                ))}
-                {filtered.length === 0 && (
+                    ))}
+                {!loading && !error && faqs.length > 0 && filtered.length === 0 && (
                     <div style={{ ...body, fontSize: 12, color: OB.textMuted, padding: "8px 0" }}>
                         No matches — try a different search.
+                    </div>
+                )}
+                {!loading && !error && faqs.length === 0 && (
+                    <div style={{ ...body, fontSize: 12, color: OB.textMuted, padding: "8px 0" }}>
+                        No FAQs available for this module yet.
                     </div>
                 )}
             </div>

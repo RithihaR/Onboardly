@@ -3,16 +3,12 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import FaqPanel from "./FaqPanel";
 
-// Matches the marketing site: sage/olive backgrounds, navy text, black
-// pill CTAs, Fraunces for display type. dotRed is kept for "in progress /
-// needs attention" states (recording, errors, escalation) — everything
-// else now reads navy/olive instead of the old brown palette.
 const OB = {
     border: "#D7E0C9",
     cream: "#FFFFFF",
     text: "#16233D",
     textMuted: "#5C6B7A",
-    dotRed: "#B3462F",
+    dotRed: "#C1794F",
     sand: "#DDE5D0",
 };
 
@@ -32,6 +28,7 @@ function useOnboardlyFonts() {
     }, []);
 }
 
+// ---------- Typewriter effect for the welcome screen ----------
 function useTypewriter(lines: string[], speedMs = 22) {
     const [displayed, setDisplayed] = useState<string[]>([]);
     const [done, setDone] = useState(false);
@@ -74,6 +71,7 @@ function useTypewriter(lines: string[], speedMs = 22) {
     return { displayed, done };
 }
 
+// ---------- Language data ----------
 const TOP_LANGUAGES = [
     { code: "en", label: "English" },
     { code: "zh", label: "Mandarin" },
@@ -112,6 +110,7 @@ function languageLabel(code: string) {
     return ALL_LANGUAGES.find((l) => l.code === code)?.label ?? "English";
 }
 
+// ---------- Mic level meter ----------
 const IDLE_BARS = [10, 22, 14, 26, 12, 20, 16, 24, 11, 18];
 const MIN_BAR_HEIGHT = 4;
 const MAX_BAR_HEIGHT = 32;
@@ -202,6 +201,7 @@ function Waveform({ levels, listening, onClick }: { levels: number[]; listening:
     );
 }
 
+// ---------- Language picker ----------
 function LanguagePicker({ onSelect }: { onSelect: (code: string) => void }) {
     const [query, setQuery] = useState("");
     const filtered = useMemo(
@@ -254,6 +254,7 @@ function LanguagePicker({ onSelect }: { onSelect: (code: string) => void }) {
     );
 }
 
+// ---------- Main widget ----------
 type Screen = "welcome" | "language" | "main";
 
 interface OnboardlyWidgetProps {
@@ -278,14 +279,28 @@ export default function OnboardlyWidget({ moduleContent, workerId, onAskQuestion
     const [question, setQuestion] = useState("");
     const [listening, setListening] = useState(false);
 
-    const [lastQuestion, setLastQuestion] = useState<string | null>(null);
-    const [answerText, setAnswerText] = useState<string | null>(null);
-    const [escalated, setEscalated] = useState(false);
+    // ---- Q&A pipeline state ----
+    interface Turn {
+        question: string;
+        answer: string | null;
+        escalated: boolean;
+        audioUrl: string | null;
+        error: string | null;
+    }
+    const [turns, setTurns] = useState<Turn[]>([]);
     const [thinking, setThinking] = useState(false);
-    const [pipelineError, setPipelineError] = useState<string | null>(null);
-    const [speaking, setSpeaking] = useState(false);
-    const [audioUrl, setAudioUrl] = useState<string | null>(null);
+    const [sttError, setSttError] = useState<string | null>(null);
     const audioElRef = useRef<HTMLAudioElement | null>(null);
+    const conversationRef = useRef<HTMLDivElement | null>(null);
+
+    // Auto-scroll to the newest message whenever the conversation grows or
+    // a new answer streams in — otherwise new turns land below the fold and
+    // it looks like the question/answer just vanished.
+    useEffect(() => {
+        if (conversationRef.current) {
+            conversationRef.current.scrollTop = conversationRef.current.scrollHeight;
+        }
+    }, [turns, thinking]);
 
     useEffect(() => {
         const saved = typeof window !== "undefined" ? localStorage.getItem("onboardly_language") : null;
@@ -307,11 +322,13 @@ export default function OnboardlyWidget({ moduleContent, workerId, onAskQuestion
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
 
+    // Position (drag to move)
     const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
     const dragOffset = useRef<{ x: number; y: number } | null>(null);
     const [dragging, setDragging] = useState(false);
     const dragMovedRef = useRef(false);
 
+    // Size (drag corner to resize)
     const [size, setSize] = useState({ width: 340, height: 460 });
     const resizeStart = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
     const [resizing, setResizing] = useState(false);
@@ -383,9 +400,9 @@ export default function OnboardlyWidget({ moduleContent, workerId, onAskQuestion
         };
     }, [resizing]);
 
-    async function speak(text: string) {
+    // ---- Speak a piece of text via /api/tts and play it ----
+    async function speak(text: string): Promise<string | null> {
         try {
-            setSpeaking(true);
             const res = await fetch("/api/tts", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -394,33 +411,39 @@ export default function OnboardlyWidget({ moduleContent, workerId, onAskQuestion
             if (!res.ok) throw new Error("TTS request failed");
             const blob = await res.blob();
             const url = URL.createObjectURL(blob);
-            setAudioUrl(url);
             if (audioElRef.current) {
                 audioElRef.current.src = url;
+                // Autoplay may be blocked after an await — that's fine, the 🔊
+                // replay button per message is the reliable fallback.
                 audioElRef.current.play().catch(() => { });
             }
+            return url;
         } catch (err) {
             console.error("Speak failed", err);
-        } finally {
-            setSpeaking(false);
+            return null;
         }
     }
 
-    function replayAudio() {
-        if (audioElRef.current && audioUrl) {
+    function replayAudio(url: string) {
+        if (audioElRef.current) {
+            audioElRef.current.src = url;
             audioElRef.current.currentTime = 0;
             audioElRef.current.play().catch((err) => console.error("Replay failed", err));
         }
     }
 
+    // ---- Ask a question: /api/explain, grounded in moduleContent ----
     async function askQuestion(text: string) {
         if (!text.trim()) return;
         onAskQuestion?.(text, moduleContent);
-        setLastQuestion(text);
-        setAnswerText(null);
-        setEscalated(false);
-        setPipelineError(null);
-        setAudioUrl(null);
+
+        // History sent to Gemini = completed turns so far, oldest first.
+        const historyForGemini = turns
+            .filter((t) => t.answer !== null)
+            .map((t) => ({ question: t.question, answer: t.answer as string }));
+
+        const turnIndex = turns.length;
+        setTurns((prev) => [...prev, { question: text, answer: null, escalated: false, audioUrl: null, error: null }]);
         setThinking(true);
 
         try {
@@ -432,28 +455,42 @@ export default function OnboardlyWidget({ moduleContent, workerId, onAskQuestion
                     context: moduleContent || "",
                     language: selectedLanguage,
                     workerId,
+                    history: historyForGemini,
                 }),
             });
             const data = await res.json();
 
             if (data.error) throw new Error(data.message || data.error);
 
-            if (data.escalate) {
-                setEscalated(true);
-                setAnswerText(data.message);
-                await speak(data.message);
-            } else {
-                setAnswerText(data.answer);
-                await speak(data.answer);
-            }
+            const finalText = data.escalate ? data.message : data.answer;
+            const audioUrl = await speak(finalText);
+
+            setTurns((prev) => {
+                const next = [...prev];
+                next[turnIndex] = {
+                    ...next[turnIndex],
+                    answer: finalText,
+                    escalated: !!data.escalate,
+                    audioUrl,
+                };
+                return next;
+            });
         } catch (err) {
             console.error("Ask question failed", err);
-            setPipelineError("Sorry, I couldn't get an answer right now. Please try again.");
+            setTurns((prev) => {
+                const next = [...prev];
+                next[turnIndex] = {
+                    ...next[turnIndex],
+                    error: "Sorry, I couldn't get an answer right now. Please try again.",
+                };
+                return next;
+            });
         } finally {
             setThinking(false);
         }
     }
 
+    // ---- Mic: record, send to /api/stt, then feed transcript into askQuestion ----
     async function toggleListening() {
         if (listening) {
             setListening(false);
@@ -473,6 +510,7 @@ export default function OnboardlyWidget({ moduleContent, workerId, onAskQuestion
                 const blob = new Blob(chunksRef.current, { type: "audio/webm" });
 
                 setThinking(true);
+                setSttError(null);
                 try {
                     const form = new FormData();
                     form.append("audio", blob, "question.webm");
@@ -484,12 +522,12 @@ export default function OnboardlyWidget({ moduleContent, workerId, onAskQuestion
                         await askQuestion(data.text);
                     } else {
                         setThinking(false);
-                        setPipelineError("Didn't catch that — try again.");
+                        setSttError("Didn't catch that — try again.");
                     }
                 } catch (err) {
                     console.error("STT failed", err);
                     setThinking(false);
-                    setPipelineError("Couldn't transcribe that — try typing instead.");
+                    setSttError("Couldn't transcribe that — try typing instead.");
                 }
             };
             recorder.start();
@@ -509,6 +547,7 @@ export default function OnboardlyWidget({ moduleContent, workerId, onAskQuestion
 
     if (!pos) return null;
 
+    // ---------- Collapsed bubble ----------
     if (!expanded) {
         return (
             <button
@@ -539,6 +578,7 @@ export default function OnboardlyWidget({ moduleContent, workerId, onAskQuestion
         >
             <audio ref={audioElRef} style={{ display: "none" }} />
 
+            {/* Title bar */}
             <div
                 onMouseDown={onDragStart}
                 style={{ padding: "14px 16px 10px", cursor: dragging ? "grabbing" : "grab", userSelect: "none", position: "relative", flexShrink: 0 }}
@@ -592,6 +632,7 @@ export default function OnboardlyWidget({ moduleContent, workerId, onAskQuestion
                 </div>
             </div>
 
+            {/* Screens */}
             {screen === "welcome" && (
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 24px 20px", overflowY: "auto" }}>
                     <div
@@ -643,23 +684,27 @@ export default function OnboardlyWidget({ moduleContent, workerId, onAskQuestion
                             </p>
                         </div>
 
-                        <div style={{ flex: 1, overflowY: "auto", padding: "8px 18px" }}>
-                            {thinking && (
-                                <p style={{ ...body, fontSize: 12.5, color: OB.textMuted, fontStyle: "italic" }}>Thinking…</p>
+                        {/* Conversation log */}
+                        <div ref={conversationRef} style={{ flex: 1, overflowY: "auto", padding: "8px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
+                            {sttError && (
+                                <p style={{ ...body, fontSize: 12.5, color: OB.dotRed, margin: 0 }}>{sttError}</p>
                             )}
-                            {pipelineError && (
-                                <p style={{ ...body, fontSize: 12.5, color: OB.dotRed }}>{pipelineError}</p>
-                            )}
-                            {!thinking && !pipelineError && lastQuestion && (
-                                <div>
+
+                            {turns.map((turn, i) => (
+                                <div key={i}>
                                     <p style={{ ...body, fontSize: 11.5, color: OB.textMuted, marginBottom: 6 }}>
-                                        <strong>You asked:</strong> {lastQuestion}
+                                        <strong>You asked:</strong> {turn.question}
                                     </p>
-                                    {answerText && (
+
+                                    {turn.error && (
+                                        <p style={{ ...body, fontSize: 12.5, color: OB.dotRed, margin: 0 }}>{turn.error}</p>
+                                    )}
+
+                                    {turn.answer && (
                                         <div
                                             style={{
-                                                background: escalated ? "#FDECEA" : OB.sand,
-                                                border: `1px solid ${escalated ? OB.dotRed : OB.border}`,
+                                                background: turn.escalated ? "#FDECEA" : OB.sand,
+                                                border: `1px solid ${turn.escalated ? OB.dotRed : OB.border}`,
                                                 borderRadius: 10,
                                                 padding: "10px 12px",
                                                 fontSize: 13,
@@ -672,12 +717,12 @@ export default function OnboardlyWidget({ moduleContent, workerId, onAskQuestion
                                             }}
                                         >
                                             <div style={{ flex: 1 }}>
-                                                {escalated && <strong style={{ color: OB.dotRed }}>Escalated: </strong>}
-                                                {answerText}
+                                                {turn.escalated && <strong style={{ color: OB.dotRed }}>Escalated: </strong>}
+                                                {turn.answer}
                                             </div>
-                                            {audioUrl && (
+                                            {turn.audioUrl && (
                                                 <button
-                                                    onClick={replayAudio}
+                                                    onClick={() => replayAudio(turn.audioUrl as string)}
                                                     aria-label="Play answer aloud"
                                                     title="Play aloud"
                                                     style={{
@@ -695,8 +740,14 @@ export default function OnboardlyWidget({ moduleContent, workerId, onAskQuestion
                                             )}
                                         </div>
                                     )}
+
+                                    {!turn.answer && !turn.error && thinking && i === turns.length - 1 && (
+                                        <p style={{ ...body, fontSize: 12.5, color: OB.textMuted, fontStyle: "italic", margin: 0 }}>
+                                            Thinking…
+                                        </p>
+                                    )}
                                 </div>
-                            )}
+                            ))}
                         </div>
 
                         <form onSubmit={handleSubmit} style={{ padding: "10px 18px 6px", flexShrink: 0 }}>
@@ -715,6 +766,7 @@ export default function OnboardlyWidget({ moduleContent, workerId, onAskQuestion
                 )
             )}
 
+            {/* Resize handle */}
             <div
                 onMouseDown={onResizeStart}
                 style={{
