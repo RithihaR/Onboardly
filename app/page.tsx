@@ -12,7 +12,7 @@ const inter = Inter({ subsets: ['latin'], weight: ['400', '500'], variable: '--f
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] as const } },
 };
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.12 } } };
 
@@ -79,7 +79,7 @@ export default function Home() {
       {/* Hero */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 -z-10 opacity-40"><AnimatedGlowBackground /></div>
-        <div className="max-w-5x1 mx-auto px-8 pt-28 pb-20 text-center">
+        <div className="max-w-5xl mx-auto px-8 pt-28 pb-20 text-center">
           <motion.p initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }} className="text-sm mb-5" style={{ color: '#344966' }}>
             For construction, warehousing, and hospitality employers
           </motion.p>
@@ -102,7 +102,7 @@ export default function Home() {
       </section>
 
       {/* Feature cards */}
-      <section className="max-w-5x1 mx-auto px-8 py-16">
+      <section className="max-w-5xl mx-auto px-8 py-16">
         <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-80px' }} className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           <FeatureCard icon="headphones" title="Spoken induction" description="Real voice narration of every safety and HR step, not just text on a screen." />
           <FeatureCard icon="check" title="Understood, not just delivered" description="Workers confirm each step so managers know it landed, not just that it played." />
@@ -112,7 +112,7 @@ export default function Home() {
 
       {/* Why section */}
       <section className="border-t" style={{ borderColor: '#34496622', backgroundColor: '#344966', color: '#F0F4EF' }}>
-        <div className="max-w-5x1 mx-auto px-8 py-24">
+        <div className="max-w-5xl mx-auto px-8 py-24">
           <Reveal><h2 style={{ fontFamily: 'var(--font-fraunces)', fontSize: '28px', fontWeight: 500 }} className="mb-10">Why we built this</h2></Reveal>
           <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-80px' }} className="grid grid-cols-1 sm:grid-cols-3 gap-10 text-sm leading-relaxed">
             {[
@@ -130,7 +130,7 @@ export default function Home() {
       </section>
 
       {/* How it works */}
-      <section className="max-w-5x1 mx-auto px-8 py-24">
+      <section className="max-w-5xl mx-auto px-8 py-24">
         <Reveal><h2 style={{ fontFamily: 'var(--font-fraunces)', fontSize: '28px', fontWeight: 500 }} className="mb-10">What actually happens</h2></Reveal>
         <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-80px' }} className="space-y-8">
           {[
@@ -152,7 +152,7 @@ export default function Home() {
 
       {/* Scenarios */}
       <section id="scenarios" className="border-t" style={{ borderColor: '#34496622' }}>
-        <div className="max-w-5x1 mx-auto px-8 py-28">
+        <div className="max-w-5xl mx-auto px-8 py-28">
           <Reveal><h2 style={{ fontFamily: 'var(--font-fraunces)', fontSize: '32px', fontWeight: 500 }} className="mb-4 text-center">Two real scenarios, ready to try</h2></Reveal>
           <Reveal><p className="text-base leading-relaxed max-w-lg mx-auto mb-14 text-center" style={{ color: '#344966' }}>These aren't mockups — pick one and go through the actual flow, with real ElevenLabs voice narration.</p></Reveal>
           <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-80px' }} className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -168,4 +168,4 @@ export default function Home() {
       </footer>
     </div>
   );
-}
+} 
