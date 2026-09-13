@@ -52,11 +52,6 @@ const icons = {
       <circle cx="12" cy="12" r="9" /><path d="M8.5 12.5l2.2 2.2 4.8-5" />
     </svg>
   ),
-  chart: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0D1821" strokeWidth="1.8" strokeLinecap="round">
-      <path d="M4 20V10M12 20V4M20 20v-7" />
-    </svg>
-  ),
   shield: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0D1821" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" /><path d="M9 12l2 2 4-4" />
@@ -133,12 +128,12 @@ export default function Home() {
       <motion.nav initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="flex items-center justify-between px-8 py-5 border-b sticky top-0 z-40 backdrop-blur" style={{ borderColor: '#34496622', backgroundColor: '#F0F4EFcc' }}>
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full flex items-center justify-center border" style={{ borderColor: '#0D1821', fontFamily: 'var(--font-caveat)', fontSize: '15px' }}>OB</div>
-          <span style={{ fontFamily: 'var(--font-caveat)', fontSize: '26px', fontWeight: 700 }}>OnBoardly</span>
+          <span style={{ fontFamily: 'var(--font-caveat)', fontSize: '26px', fontWeight: 700 }}>Onboardly</span>
         </div>
         <a href="#scenarios" className="hidden sm:inline-block px-5 py-2 rounded-full text-sm" style={{ backgroundColor: '#0D1821', color: '#F0F4EF' }}>Try the demo</a>
       </motion.nav>
 
-      {/* Hero — split with real photo */}
+      {/* Hero, split with real photo */}
       <section ref={heroRef} className="relative overflow-hidden">
         <div className="absolute inset-0 -z-10 opacity-30"><AnimatedGlowBackground /></div>
         <div className="max-w-6xl mx-auto px-8 pt-24 pb-24 grid grid-cols-1 md:grid-cols-2 gap-14 items-center">
@@ -146,18 +141,17 @@ export default function Home() {
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }} className="mb-6">
               <span className="inline-flex items-center gap-2 text-xs px-4 py-1.5 rounded-full border" style={{ borderColor: '#34496633', backgroundColor: '#FFFFFF', color: '#344966' }}>
                 <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#BFCC94' }} />
-                Built for Australian frontline workplaces
+                Built for Australian workplaces
               </span>
             </motion.div>
             <motion.h1 initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.2 }} style={{ fontFamily: 'var(--font-fraunces)', fontSize: '46px', lineHeight: 1.12, fontWeight: 500, letterSpacing: '-0.02em' }} className="mb-6">
-              Every new worker understands day one — in their own language.
+              Onboarding new hires actually understand.
             </motion.h1>
             <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.3 }} className="text-lg leading-relaxed mb-8" style={{ color: '#344966' }}>
-              A tablet at the site entrance narrates induction, safety steps, and pay basics
-              in English, Mandarin, or Punjabi, then confirms understanding.
+              Onboardly is a widget that drops into your existing onboarding page. It walks new hires through your training modules in English, Mandarin, Arabic, Punjabi, Hindi and more than 70 other languages, and lets them ask a question instead of staying confused and quiet.
             </motion.p>
-            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.4 }} className="flex items-center gap-3 mb-9">
-              {['EN', '中文', 'ਪੰ'].map((l) => (
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.4 }} className="flex flex-wrap items-center gap-3 mb-9">
+              {['EN', '中文', 'العربية', 'ਪੰ', 'हिं', '+70'].map((l) => (
                 <motion.span key={l} whileHover={{ y: -3 }} className="w-11 h-11 rounded-full flex items-center justify-center text-sm border cursor-default" style={{ borderColor: '#0D182133', backgroundColor: '#B4CDED55' }}>{l}</motion.span>
               ))}
             </motion.div>
@@ -176,7 +170,7 @@ export default function Home() {
             className="relative"
           >
             <div className="rounded-3xl overflow-hidden aspect-[4/5] shadow-2xl">
-              <img src="/frontline-tablet.jpg" alt="A frontline worker using a tablet on site" className="w-full h-full object-cover" />
+              <img src="/frontline-tablet.jpg" alt="A worker using a tablet on site" className="w-full h-full object-cover" />
             </div>
             {/* Floating caption card */}
             <motion.div
@@ -190,7 +184,7 @@ export default function Home() {
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#BFCC94' }} />
                 <span className="text-xs font-medium">Step 2 of 5 · ਪੰਜਾਬੀ</span>
               </div>
-              <p className="text-xs leading-relaxed" style={{ color: '#344966' }}>Narrating: personal protective equipment</p>
+              <p className="text-xs leading-relaxed" style={{ color: '#344966' }}>Now showing: workplace policies</p>
             </motion.div>
           </motion.div>
         </div>
@@ -200,7 +194,7 @@ export default function Home() {
       <section className="border-y" style={{ borderColor: '#34496618', backgroundColor: '#FFFFFF' }}>
         <div className="max-w-6xl mx-auto px-8 py-7">
           <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true }} className="flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-sm" style={{ color: '#344966' }}>
-            {['Construction sites', 'Warehousing & logistics', 'Hospitality', 'Aged care', 'Emergency services'].map((s) => (
+            {['Construction sites', 'Warehousing & logistics', 'Hospitality', 'Software & tech teams', 'Aged care', 'Emergency services'].map((s) => (
               <motion.span key={s} variants={fadeUp} className="inline-flex items-center gap-2">
                 <span className="w-1 h-1 rounded-full" style={{ backgroundColor: '#BFCC94' }} />
                 {s}
@@ -212,15 +206,14 @@ export default function Home() {
 
       {/* Features */}
       <section className="max-w-6xl mx-auto px-8 py-20">
-        <Reveal><h2 style={{ fontFamily: 'var(--font-fraunces)', fontSize: '30px', fontWeight: 500 }} className="mb-3 text-center">Built for people the software industry forgot</h2></Reveal>
-        <Reveal><p className="text-base max-w-xl mx-auto mb-14 text-center leading-relaxed" style={{ color: '#344966' }}>No personal phone. No app store. No literacy assumption. Just a device at the door that speaks.</p></Reveal>
+        <Reveal><h2 style={{ fontFamily: 'var(--font-fraunces)', fontSize: '30px', fontWeight: 500 }} className="mb-3 text-center">Built to drop into what you already have</h2></Reveal>
+        <Reveal><p className="text-base max-w-xl mx-auto mb-14 text-center leading-relaxed" style={{ color: '#344966' }}>No new login, no app to install, no platform to migrate to. Onboardly sits inside the onboarding page your business already uses, for a warehouse team or a software team alike.</p></Reveal>
         <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-80px' }} className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-          <FeatureCard icon="headphones" title="Spoken induction" description="Real voice narration of every safety and HR step, not just text on a screen." />
-          <FeatureCard icon="check" title="Understood, not just delivered" description="Workers confirm each step so managers know it landed, not just that it played." />
-          <FeatureCard icon="chart" title="Live manager view" description="Completion status per worker, per language, updating without a paper checklist." />
-          <FeatureCard icon="globe" title="Three languages, day one" description="English, Mandarin, and Punjabi — chosen from actual Australian census data, not guesswork." />
-          <FeatureCard icon="shield" title="Answers, never guesses" description="Questions it can't answer from approved documents escalate to a supervisor instead." />
-          <FeatureCard icon="clock" title="Ready in minutes" description="Load your induction content, sit a tablet at the entrance, and you're running." />
+          <FeatureCard icon="headphones" title="Guided modules" description="Every onboarding module explained clearly, not handed over as a wall of policy text." />
+          <FeatureCard icon="check" title="Understood, not just delivered" description="Workers confirm each step so businesses know it landed, not just that it played." />
+          <FeatureCard icon="globe" title="Every language your workforce speaks" description="English, Mandarin, Arabic, Punjabi, Hindi and more than 70 others, matched to real workforce data, not guesswork." />
+          <FeatureCard icon="shield" title="Answers, never guesses" description="If a question falls outside what has been approved, it is flagged for a real person, never a made up answer." />
+          <FeatureCard icon="clock" title="Ready in minutes" description="Load your onboarding content, drop the widget in, and you are running." />
         </motion.div>
       </section>
 
@@ -229,7 +222,7 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-8 py-24 grid grid-cols-1 md:grid-cols-2 gap-14 items-center">
           <Reveal>
             <div className="rounded-3xl overflow-hidden aspect-[4/3] shadow-xl">
-              <img src="/warehouse-worker.jpg" alt="A warehouse worker filling in a paper logbook" loading="lazy" className="w-full h-full object-cover" />
+              <img src="/warehouse-worker.jpg" alt="A worker filling in a paper logbook" loading="lazy" className="w-full h-full object-cover" />
             </div>
           </Reveal>
           <div>
@@ -240,7 +233,7 @@ export default function Home() {
             </Reveal>
             <Reveal>
               <p className="text-base leading-relaxed mb-5" style={{ color: '#344966' }}>
-                A paper form in a language you half-read. A supervisor reciting safety rules from memory,
+                A paper form in a language you half read. A supervisor reciting the rules from memory,
                 in a hurry, in English. A nod that means "I don't want to look slow," not "I understand."
               </p>
             </Reveal>
@@ -261,7 +254,7 @@ export default function Home() {
           <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-80px' }} className="grid grid-cols-1 sm:grid-cols-3 gap-10 text-sm leading-relaxed">
             <motion.div variants={fadeUp}>
               <p className="text-4xl mb-3" style={{ fontFamily: 'var(--font-fraunces)', color: '#BFCC94' }}><Counter to={239000} suffix="+" /></p>
-              <p style={{ color: '#B4CDED' }}>Punjabi speakers in Australia, the fastest growing language in the country — most onboarding still happens in English only.</p>
+              <p style={{ color: '#B4CDED' }}>Punjabi speakers in Australia, the fastest growing language in the country. Most onboarding still happens in English only.</p>
             </motion.div>
             <motion.div variants={fadeUp}>
               <p className="text-4xl mb-3" style={{ fontFamily: 'var(--font-fraunces)', color: '#BFCC94' }}>1 in 3</p>
@@ -269,7 +262,7 @@ export default function Home() {
             </motion.div>
             <motion.div variants={fadeUp}>
               <p className="text-4xl mb-3" style={{ fontFamily: 'var(--font-fraunces)', color: '#BFCC94' }}>0 apps</p>
-              <p style={{ color: '#B4CDED' }}>No smartphone, no data plan, no account to make — just a device already sitting at the site entrance.</p>
+              <p style={{ color: '#B4CDED' }}>No smartphone, no data plan, no account to make. Just a widget already sitting inside the onboarding page you use.</p>
             </motion.div>
           </motion.div>
         </div>
@@ -282,7 +275,7 @@ export default function Home() {
             "Workers nod along because saying <span style={{ color: '#344966' }}>I don't understand</span> costs more than pretending."
           </p>
         </Reveal>
-        <Reveal><p className="text-sm mt-6" style={{ color: '#344966' }}>The problem OnBoardly is built to remove</p></Reveal>
+        <Reveal><p className="text-sm mt-6" style={{ color: '#344966' }}>The problem Onboardly is built to remove</p></Reveal>
       </section>
 
       {/* How it works */}
@@ -292,11 +285,10 @@ export default function Home() {
             <Reveal><h2 style={{ fontFamily: 'var(--font-fraunces)', fontSize: '30px', fontWeight: 500 }} className="mb-10">What actually happens</h2></Reveal>
             <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-80px' }} className="space-y-7">
               {[
-                { title: 'Pick a language', body: 'English, Mandarin, or Punjabi — one tap, no menus to dig through.' },
-                { title: 'Listen to each step', body: 'PPE, exits, hazard reporting, pay — narrated aloud with a transcript on screen.' },
-                { title: 'Ask anything, out loud', body: 'Speak a question, get a grounded answer — or a clear handoff to a supervisor.' },
-                { title: 'Confirm you understood', body: 'A tap or spoken response. No long quiz before a first shift.' },
-                { title: 'Manager sees it live', body: "Who's done what, in which language, without chasing paper." },
+                { title: 'Pick a language', body: 'English, Mandarin, Arabic, Punjabi, Hindi and more than 70 others. One tap, no menus to dig through.' },
+                { title: 'Go through each module', body: 'Safety steps, company policies, tools, pay basics, whatever your onboarding covers, explained clearly with a transcript on screen.' },
+                { title: 'Ask a question anytime', body: 'Get a grounded answer, or a clear note that it has been passed to someone who can help.' },
+                { title: 'Confirm you understood', body: 'A simple tap or quick response. No long quiz before a first shift.' },
               ].map((step, i) => (
                 <motion.div key={step.title} variants={fadeUp} className="flex gap-5 items-start">
                   <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs shrink-0 mt-0.5 font-medium" style={{ backgroundColor: '#BFCC94', color: '#0D1821' }}>{i + 1}</div>
@@ -310,37 +302,7 @@ export default function Home() {
           </div>
           <Reveal className="flex items-center">
             <div className="rounded-3xl overflow-hidden aspect-[3/4] shadow-xl w-full">
-              <img src="/warehouse-checking.jpg" alt="A supervisor checking progress on a tablet in a warehouse" loading="lazy" className="w-full h-full object-cover" />
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* Manager dashboard section */}
-      <section className="border-t" style={{ borderColor: '#34496622', backgroundColor: '#FFFFFF' }}>
-        <div className="max-w-6xl mx-auto px-8 py-24 grid grid-cols-1 md:grid-cols-2 gap-14 items-center">
-          <div>
-            <Reveal><h2 style={{ fontFamily: 'var(--font-fraunces)', fontSize: '32px', fontWeight: 500, lineHeight: 1.25 }} className="mb-6">Managers stop guessing who's actually ready.</h2></Reveal>
-            <Reveal>
-              <p className="text-base leading-relaxed mb-6" style={{ color: '#344966' }}>
-                Every confirmation, every question asked, every escalation — logged as it happens.
-                Not a signature on a clipboard that proves someone held a pen.
-              </p>
-            </Reveal>
-            <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true }} className="space-y-3">
-              {['Completion status per worker, per module', 'Which language each worker chose', 'Questions that needed a human answer'].map((item) => (
-                <motion.div key={item} variants={fadeUp} className="flex items-center gap-3 text-sm" style={{ color: '#344966' }}>
-                  <span className="w-5 h-5 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: '#BFCC94' }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0D1821" strokeWidth="3" strokeLinecap="round"><path d="M5 13l4 4L19 7" /></svg>
-                  </span>
-                  {item}
-                </motion.div>
-              ))}
-            </motion.div>
-          </div>
-          <Reveal>
-            <div className="rounded-3xl overflow-hidden aspect-[4/3] shadow-xl">
-              <img src="/dashboard.jpg" alt="A manager reviewing a compliance dashboard" loading="lazy" className="w-full h-full object-cover" />
+              <img src="/warehouse-checking.jpg" alt="A worker checking a module on a tablet" loading="lazy" className="w-full h-full object-cover" />
             </div>
           </Reveal>
         </div>
@@ -350,10 +312,10 @@ export default function Home() {
       <section id="scenarios" className="border-t" style={{ borderColor: '#34496622' }}>
         <div className="max-w-5xl mx-auto px-8 py-28">
           <Reveal><h2 style={{ fontFamily: 'var(--font-fraunces)', fontSize: '34px', fontWeight: 500 }} className="mb-4 text-center">Two real scenarios, ready to try</h2></Reveal>
-          <Reveal><p className="text-base leading-relaxed max-w-lg mx-auto mb-14 text-center" style={{ color: '#344966' }}>These aren't mockups — pick one and go through the actual flow, with real voice narration and live answers.</p></Reveal>
+          <Reveal><p className="text-base leading-relaxed max-w-lg mx-auto mb-14 text-center" style={{ color: '#344966' }}>These are not mockups. Pick one and go through the actual flow.</p></Reveal>
           <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-80px' }} className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <ScenarioCard tag="Frontline" title="Warehouse worker" description="A frontline warehouse hire goes through site safety, PPE, and hazard reporting in their own language before their first shift." href="/onboarding/warehouse" image="/warehouse-checking.jpg" />
-            <ScenarioCard tag="Office" title="Office / software new hire" description="A new office employee walks through company policy, tools, and team basics — the same voice-first approach, a different setting." href="/onboarding/software" image="/office-team.jpg" />
+            <ScenarioCard tag="Frontline" title="Warehouse worker" description="A frontline warehouse hire goes through site safety, PPE, and hazard reporting in a language they actually understand before their first shift." href="/onboarding/warehouse" image="/warehouse-checking.jpg" />
+            <ScenarioCard tag="Office" title="Office / software new hire" description="A new office employee walks through company policy, tools, and team basics. Same approach, a different setting." href="/onboarding/software" image="/office-team.jpg" />
           </motion.div>
         </div>
       </section>
@@ -363,9 +325,9 @@ export default function Home() {
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-10 pb-12 border-b" style={{ borderColor: '#F0F4EF22' }}>
             <div>
-              <span style={{ fontFamily: 'var(--font-caveat)', fontSize: '26px' }}>OnBoardly</span>
+              <span style={{ fontFamily: 'var(--font-caveat)', fontSize: '26px' }}>Onboardly</span>
               <p className="text-sm mt-3 leading-relaxed" style={{ color: '#B4CDED' }}>
-                Voice-first onboarding for frontline workplaces, in the languages your workers actually speak.
+                Onboarding for any workplace, in the languages your workers actually speak.
               </p>
             </div>
             <div>
@@ -380,7 +342,10 @@ export default function Home() {
               <div className="flex flex-col gap-2 text-sm" style={{ color: '#B4CDED' }}>
                 <span>English</span>
                 <span>中文 · Mandarin</span>
+                <span>العربية · Arabic</span>
                 <span>ਪੰਜਾਬੀ · Punjabi</span>
+                <span>हिन्दी · Hindi</span>
+                <span>70+ others</span>
               </div>
             </div>
           </div>
