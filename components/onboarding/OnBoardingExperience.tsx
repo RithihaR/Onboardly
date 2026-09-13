@@ -34,6 +34,13 @@ interface ModuleDetail {
   content: string;
 }
 
+// End-of-module quiz question, as served by GET /api/questions?moduleId=...
+// (answer key already stripped server-side — see app/api/questions/route.ts).
+type QuizQuestion =
+  | { moduleId: string; type: "multiple_choice"; prompt: string; options: string[] }
+  | { moduleId: string; type: "true_false"; prompt: string }
+  | { moduleId: string; type: "free_text"; prompt: string };
+
 export interface CompanyConfig {
   companyId: string;
   companyName: string;
@@ -101,6 +108,19 @@ export function OnboardingExperience({ config }: { config: CompanyConfig }) {
   const [seconds, setSeconds] = useState(0);
   const [immersive, setImmersive] = useState(false);
 
+  // End-of-module quiz gate: reading the content isn't enough to advance —
+  // the quiz question for the current module (if one is configured) must
+  // be answered correctly first. "content" = reading the module,
+  // "quiz" = answering its question. Answering wrong just re-prompts; the
+  // learner can always bail back to "content" to re-read before retrying.
+  const [moduleView, setModuleView] = useState<"content" | "quiz">("content");
+  const [question, setQuestion] = useState<QuizQuestion | null>(null);
+  const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [selectedBool, setSelectedBool] = useState<boolean | null>(null);
+  const [freeTextAnswer, setFreeTextAnswer] = useState("");
+  const [quizError, setQuizError] = useState<string | null>(null);
+  const [checkingAnswer, setCheckingAnswer] = useState(false);
+
   useEffect(() => {
     fetch(`/api/modules?company=${config.companyId}`)
       .then((r) => r.json())
@@ -150,7 +170,34 @@ export function OnboardingExperience({ config }: { config: CompanyConfig }) {
         setError("Could not load this module.");
       })
       .finally(() => setLoadingModule(false));
-  }, [moduleList, index, config.companyId, config.videoModule]);
+  }, [moduleList, index, config.companyId]);
+
+  // Load this module's quiz question (if any) and reset quiz UI state
+  // whenever the module changes. If no question is configured for a
+  // module, `question` stays null and the original "I understand this
+  // module" flow is used for it instead of the quiz gate.
+  useEffect(() => {
+    if (moduleList.length === 0) return;
+    const id = moduleList[index].id;
+    setModuleView("content");
+    setQuestion(null);
+    setSelectedOption(null);
+    setSelectedBool(null);
+    setFreeTextAnswer("");
+    setQuizError(null);
+
+    fetch(`/api/questions?moduleId=${id}`)
+      .then((r) => r.json())
+      .then((data: QuizQuestion) => {
+        if ((data as any).error) throw new Error((data as any).error);
+        setQuestion(data);
+      })
+      .catch(() => {
+        // No question configured for this module (or it failed to load) —
+        // fall back to the plain acknowledge flow, nothing to gate on.
+        setQuestion(null);
+      });
+  }, [moduleList, index]);
 
   useEffect(() => {
     const interval = setInterval(() => setSeconds((s) => s + 1), 1000);
@@ -204,6 +251,46 @@ export function OnboardingExperience({ config }: { config: CompanyConfig }) {
       setError("Couldn't save your acknowledgement — try again.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  const quizAnswerProvided =
+    question?.type === "multiple_choice"
+      ? selectedOption !== null
+      : question?.type === "true_false"
+      ? selectedBool !== null
+      : question?.type === "free_text"
+      ? freeTextAnswer.trim().length > 0
+      : false;
+
+  async function handleQuizSubmit() {
+    if (!current || !question || !quizAnswerProvided) return;
+    const answer =
+      question.type === "multiple_choice"
+        ? selectedOption
+        : question.type === "true_false"
+        ? selectedBool
+        : freeTextAnswer;
+
+    setCheckingAnswer(true);
+    setQuizError(null);
+    try {
+      const res = await fetch("/api/questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ moduleId: current.id, answer }),
+      });
+      const data = await res.json();
+      if (data.correct) {
+        await handleAcknowledge();
+      } else {
+        setQuizError("Not quite — try again, or go back to the module to review.");
+      }
+    } catch (err) {
+      console.error("Failed to check quiz answer", err);
+      setQuizError("Couldn't check your answer — try again.");
+    } finally {
+      setCheckingAnswer(false);
     }
   }
 
@@ -291,6 +378,81 @@ export function OnboardingExperience({ config }: { config: CompanyConfig }) {
               />
             </div>
           </div>
+        ) : moduleView === "quiz" && question ? (
+          <div className="bg-white shadow-2xl max-w-3xl w-full p-8 sm:p-10 flex flex-col gap-6">
+            <div>
+              <div className="text-xs font-semibold text-zinc-500 mb-2 tracking-wide">QUICK CHECK</div>
+              <h2 className={`text-xl font-bold ${theme.title}`}>{question.prompt}</h2>
+            </div>
+
+            {question.type === "multiple_choice" && (
+              <div className="flex flex-col gap-2">
+                {question.options.map((opt, i) => (
+                  <label
+                    key={i}
+                    className="flex items-center gap-3 border border-zinc-300 rounded px-3 py-2 cursor-pointer hover:bg-zinc-50"
+                  >
+                    <input
+                      type="radio"
+                      name="quiz-option"
+                      checked={selectedOption === i}
+                      onChange={() => setSelectedOption(i)}
+                    />
+                    <span className="text-zinc-700 text-sm">{opt}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {question.type === "true_false" && (
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setSelectedBool(true)}
+                  className={`px-6 py-2 text-sm font-medium border rounded ${
+                    selectedBool === true ? "bg-zinc-900 text-white border-zinc-900" : "border-zinc-300 text-zinc-700"
+                  }`}
+                >
+                  True
+                </button>
+                <button
+                  onClick={() => setSelectedBool(false)}
+                  className={`px-6 py-2 text-sm font-medium border rounded ${
+                    selectedBool === false ? "bg-zinc-900 text-white border-zinc-900" : "border-zinc-300 text-zinc-700"
+                  }`}
+                >
+                  False
+                </button>
+              </div>
+            )}
+
+            {question.type === "free_text" && (
+              <textarea
+                value={freeTextAnswer}
+                onChange={(e) => setFreeTextAnswer(e.target.value)}
+                rows={4}
+                placeholder="Type your answer…"
+                className="border border-zinc-300 rounded px-3 py-2 text-sm text-zinc-700"
+              />
+            )}
+
+            {quizError && <div className="text-red-600 text-sm">{quizError}</div>}
+
+            <div className="flex items-center gap-4">
+              <button
+                onClick={handleQuizSubmit}
+                disabled={!quizAnswerProvided || checkingAnswer}
+                className="bg-red-600 hover:bg-red-500 text-white font-bold px-6 py-2.5 text-sm disabled:opacity-60 disabled:cursor-default transition-colors"
+              >
+                {checkingAnswer ? "Checking…" : "Submit answer"}
+              </button>
+              <button
+                onClick={() => setModuleView("content")}
+                className="text-sm text-zinc-500 underline hover:text-zinc-700"
+              >
+                ← Back to module
+              </button>
+            </div>
+          </div>
         ) : (
           <div className="bg-white shadow-2xl max-w-3xl w-full p-8 sm:p-10 flex flex-col sm:flex-row gap-8 items-start">
             <div className="flex-1">
@@ -321,13 +483,25 @@ export function OnboardingExperience({ config }: { config: CompanyConfig }) {
           </button>
 
           {!acknowledged ? (
-            <button
-              onClick={handleAcknowledge}
-              disabled={saving}
-              className="bg-red-600 hover:bg-red-500 text-white font-bold px-6 py-2.5 text-sm disabled:opacity-60 disabled:cursor-default transition-colors"
-            >
-              {saving ? "Saving…" : isVideoStep ? "I've watched this" : "I understand this module"}
-            </button>
+            moduleView === "quiz" ? (
+              // Submit / Back to module controls live on the quiz card itself.
+              <span className="text-white/70 text-xs">Answer the question above to continue</span>
+            ) : question ? (
+              <button
+                onClick={() => setModuleView("quiz")}
+                className="bg-red-600 hover:bg-red-500 text-white font-bold px-6 py-2.5 text-sm transition-colors"
+              >
+                Continue to quiz →
+              </button>
+            ) : (
+              <button
+                onClick={handleAcknowledge}
+                disabled={saving}
+                className="bg-red-600 hover:bg-red-500 text-white font-bold px-6 py-2.5 text-sm disabled:opacity-60 disabled:cursor-default transition-colors"
+              >
+                {saving ? "Saving…" : isVideoStep ? "I've watched this" : "I understand this module"}
+              </button>
+            )
           ) : (
             <div className="flex items-center gap-3">
               {isLast && <span className="text-white text-xs font-medium">All modules complete ✓</span>}
