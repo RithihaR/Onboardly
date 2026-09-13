@@ -260,8 +260,8 @@ type Screen = "welcome" | "language" | "main";
 interface OnboardlyWidgetProps {
     language?: string;
     moduleContent?: string;
+    workerId?: string;
     onAskQuestion?: (question: string, moduleContent?: string) => void;
-    onVoiceCaptured?: (audioBlob: Blob) => void;
 }
 
 const WELCOME_LINES = [
@@ -269,7 +269,7 @@ const WELCOME_LINES = [
     "I'll walk you through your training and answer any questions along the way.",
 ];
 
-export default function OnboardlyWidget({ moduleContent, onAskQuestion, onVoiceCaptured }: OnboardlyWidgetProps) {
+export default function OnboardlyWidget({ moduleContent, workerId, onAskQuestion }: OnboardlyWidgetProps) {
     useOnboardlyFonts();
 
     const [expanded, setExpanded] = useState(true);
@@ -278,6 +278,15 @@ export default function OnboardlyWidget({ moduleContent, onAskQuestion, onVoiceC
     const [view, setView] = useState<"ask" | "faq">("ask");
     const [question, setQuestion] = useState("");
     const [listening, setListening] = useState(false);
+
+    const [lastQuestion, setLastQuestion] = useState<string | null>(null);
+    const [answerText, setAnswerText] = useState<string | null>(null);
+    const [escalated, setEscalated] = useState(false);
+    const [thinking, setThinking] = useState(false);
+    const [pipelineError, setPipelineError] = useState<string | null>(null);
+    const [speaking, setSpeaking] = useState(false);
+    const [audioUrl, setAudioUrl] = useState<string | null>(null);
+    const audioElRef = useRef<HTMLAudioElement | null>(null);
 
     useEffect(() => {
         const saved = typeof window !== "undefined" ? localStorage.getItem("onboardly_language") : null;
@@ -375,6 +384,80 @@ export default function OnboardlyWidget({ moduleContent, onAskQuestion, onVoiceC
         };
     }, [resizing]);
 
+    async function speak(text: string) {
+        try {
+            setSpeaking(true);
+            const res = await fetch("/api/tts", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text, language: selectedLanguage, mode: "answer" }),
+            });
+            if (!res.ok) throw new Error("TTS request failed");
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            setAudioUrl(url);
+            if (audioElRef.current) {
+                audioElRef.current.src = url;
+                // Autoplay may be blocked by the browser since this runs after an
+                // await — that's fine, the 🔊 replay button below is the reliable
+                // fallback (a direct click always satisfies autoplay policies).
+                audioElRef.current.play().catch(() => { });
+            }
+        } catch (err) {
+            console.error("Speak failed", err);
+        } finally {
+            setSpeaking(false);
+        }
+    }
+
+    function replayAudio() {
+        if (audioElRef.current && audioUrl) {
+            audioElRef.current.currentTime = 0;
+            audioElRef.current.play().catch((err) => console.error("Replay failed", err));
+        }
+    }
+
+    async function askQuestion(text: string) {
+        if (!text.trim()) return;
+        onAskQuestion?.(text, moduleContent);
+        setLastQuestion(text);
+        setAnswerText(null);
+        setEscalated(false);
+        setPipelineError(null);
+        setAudioUrl(null);
+        setThinking(true);
+
+        try {
+            const res = await fetch("/api/explain", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    question: text,
+                    context: moduleContent || "",
+                    language: selectedLanguage,
+                    workerId,
+                }),
+            });
+            const data = await res.json();
+
+            if (data.error) throw new Error(data.message || data.error);
+
+            if (data.escalate) {
+                setEscalated(true);
+                setAnswerText(data.message);
+                await speak(data.message);
+            } else {
+                setAnswerText(data.answer);
+                await speak(data.answer);
+            }
+        } catch (err) {
+            console.error("Ask question failed", err);
+            setPipelineError("Sorry, I couldn't get an answer right now. Please try again.");
+        } finally {
+            setThinking(false);
+        }
+    }
+
     async function toggleListening() {
         if (listening) {
             setListening(false);
@@ -389,10 +472,29 @@ export default function OnboardlyWidget({ moduleContent, onAskQuestion, onVoiceC
             recorder.ondataavailable = (e) => {
                 if (e.data.size > 0) chunksRef.current.push(e.data);
             };
-            recorder.onstop = () => {
-                const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-                onVoiceCaptured?.(blob);
+            recorder.onstop = async () => {
                 stream.getTracks().forEach((t) => t.stop());
+                const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+
+                setThinking(true);
+                try {
+                    const form = new FormData();
+                    form.append("audio", blob, "question.webm");
+                    form.append("language", selectedLanguage);
+                    const res = await fetch("/api/stt", { method: "POST", body: form });
+                    const data = await res.json();
+                    if (data.error) throw new Error(data.message || data.error);
+                    if (data.text) {
+                        await askQuestion(data.text);
+                    } else {
+                        setThinking(false);
+                        setPipelineError("Didn't catch that — try again.");
+                    }
+                } catch (err) {
+                    console.error("STT failed", err);
+                    setThinking(false);
+                    setPipelineError("Couldn't transcribe that — try typing instead.");
+                }
             };
             recorder.start();
             mediaRecorderRef.current = recorder;
@@ -405,7 +507,7 @@ export default function OnboardlyWidget({ moduleContent, onAskQuestion, onVoiceC
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         if (!question.trim()) return;
-        onAskQuestion?.(question, moduleContent);
+        askQuestion(question);
         setQuestion("");
     }
 
@@ -439,6 +541,8 @@ export default function OnboardlyWidget({ moduleContent, onAskQuestion, onVoiceC
                 boxShadow: "0 8px 28px rgba(0,0,0,0.10)", display: "flex", flexDirection: "column",
             }}
         >
+            <audio ref={audioElRef} style={{ display: "none" }} />
+
             <div
                 onMouseDown={onDragStart}
                 style={{ padding: "14px 16px 10px", cursor: dragging ? "grabbing" : "grab", userSelect: "none", position: "relative", flexShrink: 0 }}
@@ -543,7 +647,61 @@ export default function OnboardlyWidget({ moduleContent, onAskQuestion, onVoiceC
                             </p>
                         </div>
 
-                        <div style={{ flex: 1 }} />
+                        <div style={{ flex: 1, overflowY: "auto", padding: "8px 18px" }}>
+                            {thinking && (
+                                <p style={{ ...body, fontSize: 12.5, color: OB.textMuted, fontStyle: "italic" }}>Thinking…</p>
+                            )}
+                            {pipelineError && (
+                                <p style={{ ...body, fontSize: 12.5, color: OB.dotRed }}>{pipelineError}</p>
+                            )}
+                            {!thinking && !pipelineError && lastQuestion && (
+                                <div>
+                                    <p style={{ ...body, fontSize: 11.5, color: OB.textMuted, marginBottom: 6 }}>
+                                        <strong>You asked:</strong> {lastQuestion}
+                                    </p>
+                                    {answerText && (
+                                        <div
+                                            style={{
+                                                background: escalated ? "#FDECEA" : OB.sand,
+                                                border: `1px solid ${escalated ? OB.dotRed : OB.border}`,
+                                                borderRadius: 10,
+                                                padding: "10px 12px",
+                                                fontSize: 13,
+                                                color: OB.text,
+                                                lineHeight: 1.5,
+                                                display: "flex",
+                                                alignItems: "flex-start",
+                                                gap: 8,
+                                                ...body,
+                                            }}
+                                        >
+                                            <div style={{ flex: 1 }}>
+                                                {escalated && <strong style={{ color: OB.dotRed }}>Escalated: </strong>}
+                                                {answerText}
+                                            </div>
+                                            {audioUrl && (
+                                                <button
+                                                    onClick={replayAudio}
+                                                    aria-label="Play answer aloud"
+                                                    title="Play aloud"
+                                                    style={{
+                                                        flexShrink: 0,
+                                                        background: "none",
+                                                        border: "none",
+                                                        fontSize: 16,
+                                                        cursor: "pointer",
+                                                        padding: 0,
+                                                        lineHeight: 1,
+                                                    }}
+                                                >
+                                                    🔊
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
 
                         <form onSubmit={handleSubmit} style={{ padding: "10px 18px 6px", flexShrink: 0 }}>
                             <input
