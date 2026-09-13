@@ -3,23 +3,22 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import FaqPanel from "./FaqPanel";
 
+// Matches the marketing site: sage/olive backgrounds, navy text, black
+// pill CTAs, Fraunces for display type. dotRed is kept for "in progress /
+// needs attention" states (recording, errors, escalation) — everything
+// else now reads navy/olive instead of the old brown palette.
 const OB = {
-    border: "#E4DFD3",
+    border: "#D7E0C9",
     cream: "#FFFFFF",
-    text: "#2B2620",
-    textMuted: "#8A8271",
-    amber: "#E8A93B",
-    red: "#C0453B",
-    green: "#7BAA5A",
-    dotRed: "#8B3A2E",
-    dotAmber: "#E0A83E",
-    dotGreen: "#7BAA5A",
-    sand: "#EDE7D9",
+    text: "#16233D",
+    textMuted: "#5C6B7A",
+    dotRed: "#B3462F",
+    sand: "#DDE5D0",
 };
 
 const cursive = { fontFamily: "'Caveat', 'Segoe Script', cursive" };
-const body = { fontFamily: "'IBM Plex Sans', sans-serif" };
-const disp = { fontFamily: "'Space Grotesk', sans-serif" };
+const body = { fontFamily: "'Inter', sans-serif" };
+const disp = { fontFamily: "'Fraunces', serif" };
 
 function useOnboardlyFonts() {
     useEffect(() => {
@@ -28,7 +27,7 @@ function useOnboardlyFonts() {
         link.id = "ob-widget-fonts";
         link.rel = "stylesheet";
         link.href =
-            "https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Space+Grotesk:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap";
+            "https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Fraunces:wght@500;600&family=Inter:wght@400;500;600&display=swap";
         document.head.appendChild(link);
     }, []);
 }
@@ -398,9 +397,6 @@ export default function OnboardlyWidget({ moduleContent, workerId, onAskQuestion
             setAudioUrl(url);
             if (audioElRef.current) {
                 audioElRef.current.src = url;
-                // Autoplay may be blocked by the browser since this runs after an
-                // await — that's fine, the 🔊 replay button below is the reliable
-                // fallback (a direct click always satisfies autoplay policies).
                 audioElRef.current.play().catch(() => { });
             }
         } catch (err) {
@@ -579,12 +575,12 @@ export default function OnboardlyWidget({ moduleContent, workerId, onAskQuestion
                             onMouseDown={(e) => e.stopPropagation()}
                             aria-label="Frequently asked questions"
                             style={{
-                                width: 26, height: 26, borderRadius: "50%", border: `1.5px solid ${OB.dotRed}`,
-                                background: view === "faq" ? OB.dotRed : "none", fontSize: 13, fontWeight: 700, cursor: "pointer",
+                                width: 26, height: 26, borderRadius: "50%", border: `1.5px solid ${OB.text}`,
+                                background: view === "faq" ? OB.text : "none", fontSize: 13, fontWeight: 700, cursor: "pointer",
                                 display: "flex", alignItems: "center", justifyContent: "center",
                             }}
                         >
-                            <span style={{ color: view === "faq" ? OB.cream : OB.dotRed }}>?</span>
+                            <span style={{ color: view === "faq" ? OB.cream : OB.text }}>?</span>
                         </button>
                     </div>
                 )}
@@ -617,7 +613,7 @@ export default function OnboardlyWidget({ moduleContent, workerId, onAskQuestion
                         onClick={() => setScreen("language")}
                         disabled={!done}
                         style={{
-                            ...disp, background: OB.text, color: "#fff", border: "none", borderRadius: 8,
+                            ...disp, background: "#14181F", color: "#fff", border: "none", borderRadius: 999,
                             padding: "11px 28px", fontSize: 13.5, fontWeight: 600, cursor: done ? "pointer" : "default",
                             opacity: done ? 1 : 0.4, transition: "opacity 0.2s",
                         }}
